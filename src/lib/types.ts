@@ -224,7 +224,7 @@ export function buildResults(
       k,
       +(turnScores.reduce((s, t) => s + t[k], 0) / turnScores.length).toFixed(1),
     ])
-  ) as RadarScores;
+  ) as unknown as RadarScores;
 
   const turns: TurnFeedback[] = questions.map((q, i) => {
     const scores = turnScores[i];
