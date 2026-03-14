@@ -167,6 +167,7 @@ export default function InterviewPage() {
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [timerMaxSecs, setTimerMaxSecs] = useState(0);
   const [durationId, setDurationId] = useState("");
+  const [interviewerResponse, setInterviewerResponse] = useState("");
 
   const askedQuestionsRef = useRef<string[]>([]);
   const answersRef = useRef<string[]>([]);
@@ -197,6 +198,18 @@ export default function InterviewPage() {
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [machine.messages, machine.status]);
+
+  // Speak interviewer response via Web Speech API whenever it changes
+  useEffect(() => {
+    if (!interviewerResponse) return;
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    const utterance = new SpeechSynthesisUtterance(interviewerResponse);
+    utterance.rate = 1;
+    utterance.pitch = 1;
+    utterance.lang = machine.languageMode === "jp" ? "ja-JP" : "en-US";
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+  }, [interviewerResponse, machine.languageMode]);
 
   const sendTurnWithRetry = useCallback(
     async (userAnswer: string) => {
@@ -306,15 +319,15 @@ export default function InterviewPage() {
         return;
       }
 
-      const interviewerResponse = res.interviewer_response?.trim() ?? "";
+      const agentReply = res.interviewer_response?.trim() ?? "";
       const nextQuestion = res.next_question?.trim() || "Please introduce yourself.";
       currentQuestionIdRef.current = res.question_id ?? "q1";
       currentQuestionTextRef.current = nextQuestion;
       askedQuestionsRef.current = [nextQuestion];
 
-      if (interviewerResponse) {
-        dispatch({ type: "APPEND_MESSAGE", role: "agent", text: interviewerResponse });
-        speak(interviewerResponse, ttsLang);
+      if (agentReply) {
+        dispatch({ type: "APPEND_MESSAGE", role: "agent", text: agentReply });
+        setInterviewerResponse(agentReply);
         await sleep(400);
       }
 
@@ -322,7 +335,7 @@ export default function InterviewPage() {
         type: "QUESTION_READY",
         agentText: nextQuestion,
         scores: res.scores,
-        isFirst: !interviewerResponse,
+        isFirst: !agentReply,
       });
 
       speak(nextQuestion, ttsLang);
@@ -382,7 +395,7 @@ export default function InterviewPage() {
           return;
         }
 
-        const interviewerResponse = res.interviewer_response?.trim() ?? "";
+        const agentReply = res.interviewer_response?.trim() ?? "";
         const nextQuestion = res.next_question?.trim() || "Please continue.";
 
         // Update current question tracking for the next turn
@@ -398,9 +411,9 @@ export default function InterviewPage() {
         }
 
         // Show interviewer_response first, then next_question
-        if (interviewerResponse) {
-          dispatch({ type: "APPEND_MESSAGE", role: "agent", text: interviewerResponse });
-          speak(interviewerResponse, ttsLang);
+        if (agentReply) {
+          dispatch({ type: "APPEND_MESSAGE", role: "agent", text: agentReply });
+          setInterviewerResponse(agentReply);
           await sleep(400);
         }
 

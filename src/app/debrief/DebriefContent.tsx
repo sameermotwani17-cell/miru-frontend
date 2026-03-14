@@ -86,6 +86,7 @@ export default function DebriefContent() {
           throw new Error(`HTTP ${response.status}`);
         }
         const data = (await response.json()) as FullResults;
+        console.log("Debrief API response:", data);
         setResults(data);
         session.setResults(data);
       } catch {
@@ -196,9 +197,21 @@ export default function DebriefContent() {
     );
   }
 
-  const { radar_scores, transcript, feedback, hiring_signal } = results;
-  const lowestDim = getLowestDimension(radar_scores);
-  const avgScore = getAvgScore(radar_scores);
+  const radar_scores: RadarScores = results.radar_scores ?? {
+    communication: 0,
+    clarity: 0,
+    cultural_fit: 0,
+    problem_solving: 0,
+  };
+  const transcript = results.transcript ?? [];
+  const feedback = results.feedback ?? "";
+  const hiring_signal = results.hiring_signal ?? "";
+
+  const radarKeys = Object.keys(radar_scores) as (keyof RadarScores)[];
+  const lowestDim = radarKeys.length
+    ? getLowestDimension(radar_scores)
+    : ("communication" as keyof RadarScores);
+  const avgScore = radarKeys.length ? getAvgScore(radar_scores) : 0;
   const company = session.getCompany() ?? "";
   const sessionId = session.getSessionId() ?? "";
 
