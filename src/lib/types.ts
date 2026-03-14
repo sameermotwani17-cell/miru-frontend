@@ -252,8 +252,12 @@ export function buildResults(
   ) as unknown as RadarScores;
 
   const turns: TurnFeedback[] = questions.map((q, i) => {
-    const scores = turnScores[i];
-    const avg = Object.values(scores).reduce((a, b) => a + b, 0) / 5;
+    const scores = (turnScores[i] ?? {}) as RadarScores;
+    const values = Object.values(scores);
+    const avg =
+      values.length > 0
+        ? values.reduce((a, b) => a + b, 0) / values.length
+        : 0;
     const feedback =
       avg >= 7
         ? "Strong answer. Clear cultural alignment and specific framing. The interviewer noted this positively."
