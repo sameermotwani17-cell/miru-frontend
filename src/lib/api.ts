@@ -7,7 +7,6 @@ import type {
   RadarScores,
   FinalReport,
   Transcript,
-  TranscriptHistoryItem,
 } from "./types";
 
 function normalizeCompanyForBackend(company: string): string {
@@ -87,8 +86,6 @@ export async function sendInterviewTurn(
   userAnswer: string,
   sessionId: string,
   company: string,
-  cvContext: object,
-  transcriptHistory: TranscriptHistoryItem[],
   language: "en" | "jp"
 ): Promise<InterviewTurnResponse> {
   const normalizedCompany = normalizeCompanyForBackend(company);
@@ -102,12 +99,9 @@ export async function sendInterviewTurn(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
+        company: normalizedCompany,
         session_id: sessionId,
         user_answer: safeAnswer,
-        cv_context: cvContext,
-        transcript_history: transcriptHistory,
-        language,
-        company: normalizedCompany,
       }),
     }
   );

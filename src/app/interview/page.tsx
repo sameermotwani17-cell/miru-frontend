@@ -216,7 +216,6 @@ export default function InterviewPage() {
       const maxAttempts = 3;
       let lastError: unknown = null;
 
-      const cvContext = { cv_text: session.getCvText() ?? "" };
       const language = machine.languageMode === "jp" ? "jp" : "en";
 
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -225,8 +224,6 @@ export default function InterviewPage() {
             userAnswer,
             machine.sessionId,
             machine.company,
-            cvContext,
-            transcriptHistoryRef.current,
             language
           );
         } catch (err) {
