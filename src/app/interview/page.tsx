@@ -171,6 +171,7 @@ export default function InterviewPage() {
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const submitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const transcriptPreviewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const chatContainerRef = useRef<HTMLDivElement | null>(null);
   const chatBottomRef = useRef<HTMLDivElement | null>(null);
 
   const startedRef = useRef(false);
@@ -436,7 +437,10 @@ export default function InterviewPage() {
   }, [timerSeconds, timerMaxSecs, machine.status, finalizeInterview]);
 
   useEffect(() => {
-    chatBottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    if (!chatContainerRef.current) {
+      return;
+    }
+    chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
   }, [machine.messages, machine.status]);
 
   const startRecording = useCallback(() => {
@@ -551,7 +555,6 @@ export default function InterviewPage() {
       className="page-dark"
       style={{
         height: "100vh",
-        overflow: "hidden",
         display: "flex",
         flexDirection: "column",
         position: "relative",
@@ -662,10 +665,11 @@ export default function InterviewPage() {
         </p>
 
         <div
+          ref={chatContainerRef}
           className="glass-card"
           style={{
             width: "100%",
-            flex: 1,
+            height: "70vh",
             overflowY: "auto",
             padding: "16px",
             borderRadius: 14,
