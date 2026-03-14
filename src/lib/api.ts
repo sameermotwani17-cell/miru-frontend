@@ -7,6 +7,7 @@ import type {
   RadarScores,
   FinalReport,
   Transcript,
+  TranscriptHistoryItem,
 } from "./types";
 
 function normalizeCompanyForBackend(company: string): string {
@@ -78,18 +79,20 @@ export async function submitTurn(
       session_id: sessionId,
       user_answer: answer,
       language_mode: languageMode,
-      user_message: answer,
     }),
   });
 }
 
 export async function sendInterviewTurn(
-  message: string,
+  userAnswer: string,
   sessionId: string,
-  company: string
+  company: string,
+  cvContext: object,
+  transcriptHistory: TranscriptHistoryItem[],
+  language: "en" | "jp"
 ): Promise<InterviewTurnResponse> {
   const normalizedCompany = normalizeCompanyForBackend(company);
-  const normalizedMessage = message.trim().length === 0 ? "start" : message;
+  const safeAnswer = userAnswer.trim().length === 0 ? "start" : userAnswer;
 
   const response = await fetch(
     "https://miru-backend-production.up.railway.app/api/interview/turn",
@@ -100,10 +103,11 @@ export async function sendInterviewTurn(
       },
       body: JSON.stringify({
         session_id: sessionId,
-        user_message: normalizedMessage,
+        user_answer: safeAnswer,
+        cv_context: cvContext,
+        transcript_history: transcriptHistory,
+        language,
         company: normalizedCompany,
-        language_mode: "en",
-        duration_mins: 15,
       }),
     }
   );

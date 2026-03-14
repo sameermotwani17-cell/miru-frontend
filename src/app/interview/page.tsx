@@ -19,6 +19,7 @@ import {
   scoreAnswer,
   type InterviewScores,
   type RadarScores,
+  type TranscriptHistoryItem,
 } from "@/lib/types";
 
 type MachineStatus =
@@ -51,6 +52,7 @@ type MachineState = {
 type MachineAction =
   | { type: "SET_CONTEXT"; sessionId: string; company: string; languageMode: string }
   | { type: "STARTING" }
+  | { type: "APPEND_MESSAGE"; role: "agent" | "user"; text: string }
   | { type: "QUESTION_READY"; agentText: string; scores?: InterviewScores; isFirst: boolean }
   | { type: "LISTENING" }
   | { type: "TRANSCRIBING" }
@@ -91,6 +93,11 @@ function interviewReducer(state: MachineState, action: MachineAction): MachineSt
         ...state,
         status: "STARTING",
         error: "",
+      };
+    case "APPEND_MESSAGE":
+      return {
+        ...state,
+        messages: [...state.messages, { role: action.role, text: action.text }],
       };
     case "QUESTION_READY":
       return {
@@ -164,6 +171,9 @@ export default function InterviewPage() {
   const askedQuestionsRef = useRef<string[]>([]);
   const answersRef = useRef<string[]>([]);
   const turnScoresRef = useRef<RadarScores[]>([]);
+  const transcriptHistoryRef = useRef<TranscriptHistoryItem[]>([]);
+  const currentQuestionIdRef = useRef<string>("");
+  const currentQuestionTextRef = useRef<string>("");
 
   const transcriptRef = useRef("");
   const statusRef = useRef<MachineStatus>("IDLE");
@@ -183,14 +193,29 @@ export default function InterviewPage() {
     statusRef.current = machine.status;
   }, [machine.status]);
 
+  // Scroll to bottom whenever messages change or status changes
+  useEffect(() => {
+    chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [machine.messages, machine.status]);
+
   const sendTurnWithRetry = useCallback(
-    async (userMessage: string) => {
+    async (userAnswer: string) => {
       const maxAttempts = 3;
       let lastError: unknown = null;
 
+      const cvContext = { cv_text: session.getCvText() ?? "" };
+      const language = machine.languageMode === "jp" ? "jp" : "en";
+
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
-          return await sendInterviewTurn(userMessage, machine.sessionId, machine.company);
+          return await sendInterviewTurn(
+            userAnswer,
+            machine.sessionId,
+            machine.company,
+            cvContext,
+            transcriptHistoryRef.current,
+            language
+          );
         } catch (err) {
           lastError = err;
           if (attempt === maxAttempts) {
@@ -206,7 +231,7 @@ export default function InterviewPage() {
         ? lastError
         : new Error("Turn request failed after retries.");
     },
-    [machine.sessionId, machine.company]
+    [machine.sessionId, machine.company, machine.languageMode]
   );
 
   const finalizeInterview = useCallback(() => {
@@ -271,29 +296,36 @@ export default function InterviewPage() {
     pendingRequestRef.current = { kind: "start", answer: "start" };
     dispatch({ type: "STARTING" });
 
+    const ttsLang = machine.languageMode === "jp" ? "ja-JP" : "en-US";
+
     try {
       const res = await sendTurnWithRetry("start");
       const sid = machine.sessionId ?? crypto.randomUUID();
-      if (res.interview_complete || res.is_wrapping_up) {
+      if (res.interview_complete) {
         router.push(`/debrief?session_id=${sid}`);
         return;
       }
-      const firstPrompt = res.agent_text?.trim() || "Please introduce yourself.";
-      askedQuestionsRef.current = [firstPrompt];
+
+      const interviewerResponse = res.interviewer_response?.trim() ?? "";
+      const nextQuestion = res.next_question?.trim() || "Please introduce yourself.";
+      currentQuestionIdRef.current = res.question_id ?? "q1";
+      currentQuestionTextRef.current = nextQuestion;
+      askedQuestionsRef.current = [nextQuestion];
+
+      if (interviewerResponse) {
+        dispatch({ type: "APPEND_MESSAGE", role: "agent", text: interviewerResponse });
+        speak(interviewerResponse, ttsLang);
+        await sleep(400);
+      }
 
       dispatch({
         type: "QUESTION_READY",
-        agentText: firstPrompt,
+        agentText: nextQuestion,
         scores: res.scores,
-        isFirst: true,
+        isFirst: !interviewerResponse,
       });
 
-      speak(firstPrompt, machine.languageMode === "jp" ? "ja-JP" : "en-US");
-
-      if (res.is_wrapping_up) {
-        dispatch({ type: "WRAP_UP" });
-        finalizeInterview();
-      }
+      speak(nextQuestion, ttsLang);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to start interview.";
       dispatch({ type: "ERROR", error: msg });
@@ -301,7 +333,7 @@ export default function InterviewPage() {
     } finally {
       requestInFlightRef.current = false;
     }
-  }, [machine.sessionId, machine.languageMode, sendTurnWithRetry, finalizeInterview]);
+  }, [machine.sessionId, machine.languageMode, sendTurnWithRetry, router]);
 
   const executeAnswerTurn = useCallback(
     async (answer: string, appendUser: boolean) => {
@@ -332,19 +364,31 @@ export default function InterviewPage() {
 
       if (appendUser) {
         answersRef.current.push(safeAnswer);
+        // Append to transcript history for next request
+        transcriptHistoryRef.current.push({
+          question_id: currentQuestionIdRef.current,
+          question: currentQuestionTextRef.current,
+          user_answer: safeAnswer,
+        });
       }
+
+      const ttsLang = machine.languageMode === "jp" ? "ja-JP" : "en-US";
 
       try {
         const res = await sendTurnWithRetry(safeAnswer);
         const sid = machine.sessionId ?? crypto.randomUUID();
-        if (res.interview_complete || res.is_wrapping_up) {
+        if (res.interview_complete) {
           router.push(`/debrief?session_id=${sid}`);
           return;
         }
 
-        const nextPrompt = res.agent_text?.trim() || "Please continue.";
+        const interviewerResponse = res.interviewer_response?.trim() ?? "";
+        const nextQuestion = res.next_question?.trim() || "Please continue.";
 
-        askedQuestionsRef.current.push(nextPrompt);
+        // Update current question tracking for the next turn
+        currentQuestionIdRef.current = res.question_id ?? `q${askedQuestionsRef.current.length + 1}`;
+        currentQuestionTextRef.current = nextQuestion;
+        askedQuestionsRef.current.push(nextQuestion);
 
         const mappedScores = res.scores
           ? mapInterviewScoresToRadar(res.scores)
@@ -353,19 +397,21 @@ export default function InterviewPage() {
           turnScoresRef.current.push(mappedScores);
         }
 
+        // Show interviewer_response first, then next_question
+        if (interviewerResponse) {
+          dispatch({ type: "APPEND_MESSAGE", role: "agent", text: interviewerResponse });
+          speak(interviewerResponse, ttsLang);
+          await sleep(400);
+        }
+
         dispatch({
           type: "QUESTION_READY",
-          agentText: nextPrompt,
+          agentText: nextQuestion,
           scores: res.scores,
           isFirst: false,
         });
 
-        if (!res.is_wrapping_up) {
-          speak(nextPrompt, machine.languageMode === "jp" ? "ja-JP" : "en-US");
-        } else {
-          dispatch({ type: "WRAP_UP" });
-          finalizeInterview();
-        }
+        speak(nextQuestion, ttsLang);
 
         setTranscript("");
         transcriptRef.current = "";
@@ -376,7 +422,7 @@ export default function InterviewPage() {
         requestInFlightRef.current = false;
       }
     },
-    [machine.sessionId, machine.status, machine.languageMode, sendTurnWithRetry, finalizeInterview]
+    [machine.sessionId, machine.status, machine.languageMode, sendTurnWithRetry, router]
   );
 
   useEffect(() => {
@@ -446,13 +492,6 @@ export default function InterviewPage() {
       finalizeInterview();
     }
   }, [timerSeconds, timerMaxSecs, machine.status, finalizeInterview]);
-
-  useEffect(() => {
-    if (!chatContainerRef.current) {
-      return;
-    }
-    chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-  }, [machine.messages, machine.status]);
 
   const startRecording = useCallback(() => {
     if (machine.status !== "QUESTION") {
@@ -777,11 +816,10 @@ export default function InterviewPage() {
               color: "#c8c9e6",
             }}
           >
-            <div>Self PR: {machine.latestScores.jiko_pr}</div>
-            <div>Motivation: {machine.latestScores.shibou_douki}</div>
-            <div>Teamwork: {machine.latestScores.kyouchousei}</div>
-            <div>Growth: {machine.latestScores.seichou_iyoku}</div>
-            <div>Culture fit: {machine.latestScores.bunka_tekigou}</div>
+            <div>Communication: {machine.latestScores.communication}</div>
+            <div>Clarity: {machine.latestScores.clarity}</div>
+            <div>Cultural Fit: {machine.latestScores.cultural_fit}</div>
+            <div>Problem Solving: {machine.latestScores.problem_solving}</div>
           </div>
         )}
 

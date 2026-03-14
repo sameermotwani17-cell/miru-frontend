@@ -6,8 +6,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import MiruLogo from "@/components/MiruLogo";
 import MiruRadarChart from "@/components/MiruRadarChart";
 import ScoreBar from "@/components/ScoreBar";
-import DebriefCard from "@/components/DebriefCard";
-import RewriteComparison from "@/components/RewriteComparison";
 import { session } from "@/lib/session";
 import type { FullResults, RadarScores } from "@/lib/types";
 import { DIMENSION_LABELS } from "@/lib/types";
@@ -198,16 +196,11 @@ export default function DebriefPage() {
     );
   }
 
-  const { radar, report, feedback } = results;
-  const lowestDim = getLowestDimension(radar);
-  const avgScore = getAvgScore(radar);
-  const lowScoringTurns = feedback.turns.filter((t) => {
-    const avg = Object.values(t.scores).reduce((a, b) => a + b, 0) / Object.values(t.scores).length;
-    return avg < 7;
-  });
+  const { radar_scores, transcript, feedback, hiring_signal } = results;
+  const lowestDim = getLowestDimension(radar_scores);
+  const avgScore = getAvgScore(radar_scores);
   const company = session.getCompany() ?? "";
   const sessionId = session.getSessionId() ?? "";
-  const companyFlag = report.company_flag?.trim() || null;
 
   return (
     <div className="page-light" style={{ minHeight: "100vh", paddingBottom: 120 }}>
@@ -345,15 +338,15 @@ export default function DebriefPage() {
           <SectionHeader label="SECTION 01" title="Score Overview" />
 
           <div className="glass-card radar-chart-wrapper" style={{ padding: 32, marginBottom: 28 }}>
-            <MiruRadarChart scores={radar} />
+            <MiruRadarChart scores={radar_scores} />
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {(Object.keys(radar) as (keyof RadarScores)[]).map((key, i) => (
+            {(Object.keys(radar_scores) as (keyof RadarScores)[]).map((key, i) => (
               <ScoreBar
                 key={key}
                 label={DIMENSION_LABELS[key]}
-                score={radar[key]}
+                score={radar_scores[key]}
                 delay={i * 0.05}
                 highlight={key === lowestDim}
               />
@@ -361,38 +354,46 @@ export default function DebriefPage() {
           </div>
         </section>
 
-        {/* Section 2 — HR Monologue */}
+        {/* Section 2 — HR Feedback */}
         <section style={{ marginBottom: 80 }}>
-          <SectionHeader label="SECTION 02" title="Internal HR Monologue" />
-          <p
+          <SectionHeader label="SECTION 02" title="Interviewer Feedback" />
+
+          <div
+            className="glass-card"
             style={{
-              fontFamily: "var(--font-body)",
-              fontSize: 14,
-              color: "var(--text-page-body)",
-              marginBottom: 28,
-              lineHeight: 1.6,
+              padding: "28px 32px",
+              borderColor: "rgba(245,158,11,0.3)",
             }}
           >
-            What the interviewer was silently thinking — question by question.
-          </p>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-            {feedback.turns.length === 0 ? (
-              <p style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--text-page-muted)", fontStyle: "italic" }}>
-                No turn-by-turn feedback available for this session.
-              </p>
-            ) : (
-              feedback.turns.map((turn, i) => (
-                <DebriefCard key={turn.question_id} turn={turn} index={i} />
-              ))
-            )}
+            <p
+              style={{
+                fontSize: 11,
+                color: "var(--accent-gold)",
+                letterSpacing: "0.1em",
+                fontFamily: "var(--font-body)",
+                fontWeight: 600,
+                marginBottom: 16,
+              }}
+            >
+              OVERALL ASSESSMENT
+            </p>
+            <p
+              style={{
+                fontFamily: "var(--font-body)",
+                fontSize: 14,
+                color: "var(--text-page-body)",
+                lineHeight: 1.7,
+              }}
+            >
+              {feedback || "No feedback available for this session."}
+            </p>
           </div>
         </section>
 
-        {/* Section 3 — Rewrites */}
-        {lowScoringTurns.length > 0 && (
+        {/* Section 3 — Transcript */}
+        {transcript && transcript.length > 0 && (
           <section style={{ marginBottom: 80 }}>
-            <SectionHeader label="SECTION 03" title="Answer Rewrites" />
+            <SectionHeader label="SECTION 03" title="Interview Transcript" />
             <p
               style={{
                 fontFamily: "var(--font-body)",
@@ -402,20 +403,83 @@ export default function DebriefPage() {
                 lineHeight: 1.6,
               }}
             >
-              Answers that scored below 7 — with culturally-tuned rewrites.
+              Full record of questions asked and your responses.
             </p>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
-              {lowScoringTurns.map((turn, i) => (
-                <RewriteComparison key={turn.question_id} turn={turn} index={i} />
+            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+              {transcript.map((turn, i) => (
+                <motion.div
+                  key={turn.question_id}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-60px" }}
+                  transition={{ duration: 0.5, delay: i * 0.05, ease: [0.16, 1, 0.3, 1] }}
+                  className="glass-card"
+                  style={{ padding: "28px 28px" }}
+                >
+                  <span
+                    style={{
+                      fontFamily: "var(--font-body)",
+                      fontSize: 11,
+                      color: "var(--text-dim)",
+                      letterSpacing: "0.1em",
+                      display: "block",
+                      marginBottom: 12,
+                    }}
+                  >
+                    QUESTION {i + 1}
+                  </span>
+                  <p
+                    style={{
+                      fontFamily: "var(--font-display)",
+                      fontSize: 16,
+                      fontWeight: 600,
+                      color: "var(--text-primary)",
+                      marginBottom: 12,
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    {turn.question}
+                  </p>
+                  <div
+                    style={{
+                      padding: "12px 14px",
+                      borderRadius: 8,
+                      background: "rgba(255,255,255,0.02)",
+                      border: "1px solid var(--border-subtle)",
+                    }}
+                  >
+                    <p
+                      style={{
+                        fontSize: 11,
+                        color: "var(--text-dim)",
+                        letterSpacing: "0.08em",
+                        marginBottom: 6,
+                        fontFamily: "var(--font-body)",
+                      }}
+                    >
+                      YOU SAID
+                    </p>
+                    <p
+                      style={{
+                        fontFamily: "var(--font-body)",
+                        fontSize: 13,
+                        color: "var(--text-secondary)",
+                        lineHeight: 1.6,
+                      }}
+                    >
+                      {turn.user_answer || "[No speech detected]"}
+                    </p>
+                  </div>
+                </motion.div>
               ))}
             </div>
           </section>
         )}
 
-        {/* Section 5 — Summary (2-column: left=radar+summary, right=insights) */}
+        {/* Section 4 — Hiring Signal */}
         <section style={{ marginBottom: 80 }}>
-          <SectionHeader label="SECTION 05" title="Full Assessment" />
+          <SectionHeader label="SECTION 04" title="Hiring Signal" />
 
           <div
             style={{
@@ -425,9 +489,8 @@ export default function DebriefPage() {
               alignItems: "start",
             }}
           >
-            {/* LEFT — compact radar + overall summary */}
+            {/* LEFT — compact radar + overall score */}
             <div>
-              {/* Overall score pill */}
               <div
                 style={{
                   display: "flex",
@@ -485,10 +548,12 @@ export default function DebriefPage() {
                 className="glass-card radar-chart-wrapper"
                 style={{ padding: "16px 16px 8px", marginBottom: 20, height: 280, overflow: "hidden" }}
               >
-                <MiruRadarChart scores={radar} />
+                <MiruRadarChart scores={radar_scores} />
               </div>
+            </div>
 
-              {/* Overall summary */}
+            {/* RIGHT — hiring signal */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <div
                 className="glass-card"
                 style={{
@@ -506,7 +571,7 @@ export default function DebriefPage() {
                     marginBottom: 10,
                   }}
                 >
-                  OVERALL ASSESSMENT
+                  HIRING SIGNAL
                 </p>
                 <p
                   style={{
@@ -516,152 +581,18 @@ export default function DebriefPage() {
                     lineHeight: 1.7,
                   }}
                 >
-                  {report.overall_summary}
+                  {hiring_signal || "Assessment pending."}
                 </p>
               </div>
-            </div>
 
-            {/* RIGHT — strengths, improvements, focus, company flag */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              {/* Strengths */}
-              <div className="glass-card" style={{ padding: 22 }}>
-                <p
-                  style={{
-                    fontSize: 11,
-                    color: "var(--accent-green)",
-                    letterSpacing: "0.1em",
-                    fontFamily: "var(--font-body)",
-                    fontWeight: 600,
-                    marginBottom: 12,
-                  }}
-                >
-                  STRENGTHS
-                </p>
-                {report.strengths.length === 0 ? (
-                  <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)", fontStyle: "italic" }}>
-                    No specific strengths noted.
-                  </p>
-                ) : (
-                  <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-                    {report.strengths.map((s, i) => (
-                      <li
-                        key={i}
-                        style={{
-                          fontFamily: "var(--font-body)",
-                          fontSize: 13,
-                          color: "var(--text-secondary)",
-                          lineHeight: 1.6,
-                          paddingBottom: 8,
-                          borderBottom:
-                            i < report.strengths.length - 1
-                              ? "1px solid var(--border-subtle)"
-                              : "none",
-                          marginBottom: 8,
-                          paddingLeft: 12,
-                          position: "relative",
-                        }}
-                      >
-                        <span style={{ position: "absolute", left: 0, color: "var(--accent-green)" }}>·</span>
-                        {s}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
-              {/* Areas to Improve */}
-              <div className="glass-card" style={{ padding: 22 }}>
-                <p
-                  style={{
-                    fontSize: 11,
-                    color: "var(--accent-warm)",
-                    letterSpacing: "0.1em",
-                    fontFamily: "var(--font-body)",
-                    fontWeight: 600,
-                    marginBottom: 12,
-                  }}
-                >
-                  AREAS TO IMPROVE
-                </p>
-                {report.improvement_areas.length === 0 ? (
-                  <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)", fontStyle: "italic" }}>
-                    No improvement areas noted.
-                  </p>
-                ) : (
-                  <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-                    {report.improvement_areas.map((s, i) => (
-                      <li
-                        key={i}
-                        style={{
-                          fontFamily: "var(--font-body)",
-                          fontSize: 13,
-                          color: "var(--text-secondary)",
-                          lineHeight: 1.6,
-                          paddingBottom: 8,
-                          borderBottom:
-                            i < report.improvement_areas.length - 1
-                              ? "1px solid var(--border-subtle)"
-                              : "none",
-                          marginBottom: 8,
-                          paddingLeft: 12,
-                          position: "relative",
-                        }}
-                      >
-                        <span style={{ position: "absolute", left: 0, color: "var(--accent-warm)" }}>·</span>
-                        {s}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
-              {/* Recommended Focus */}
-              {report.recommended_focus && (
-                <div
-                  className="glass-card"
-                  style={{
-                    padding: "18px 22px",
-                    borderColor: "rgba(108,99,255,0.25)",
-                  }}
-                >
-                  <p
-                    style={{
-                      fontSize: 11,
-                      color: "var(--accent-primary)",
-                      letterSpacing: "0.1em",
-                      fontFamily: "var(--font-body)",
-                      fontWeight: 600,
-                      marginBottom: 8,
-                    }}
-                  >
-                    RECOMMENDED FOCUS
-                  </p>
-                  <p
-                    style={{
-                      fontFamily: "var(--font-body)",
-                      fontSize: 13,
-                      color: "var(--text-secondary)",
-                      lineHeight: 1.6,
-                    }}
-                  >
-                    {report.recommended_focus}
+              {company && (
+                <div className="insight-card">
+                  <span className="insight-label">{company.toUpperCase()} INTERVIEW</span>
+                  <p className="insight-body">
+                    Session ID: {sessionId.slice(0, 8)}
                   </p>
                 </div>
               )}
-
-              {/* Company Flag */}
-              {loading ? (
-                <div className="insight-card">
-                  <div className="shimmer" style={{ height: 12, width: 120, marginBottom: 12 }} />
-                  <div className="shimmer" style={{ height: 14, width: "90%", marginBottom: 8 }} />
-                  <div className="shimmer" style={{ height: 14, width: "70%" }} />
-                </div>
-              ) : companyFlag ? (
-                <div className="insight-card">
-                  <span className="insight-label">{company.toUpperCase()} INSIGHT</span>
-                  <p className="insight-body">{companyFlag}</p>
-                </div>
-              ) : null}
             </div>
           </div>
         </section>

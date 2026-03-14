@@ -1,9 +1,14 @@
 export interface RadarScores {
-  wa_teamwork: number;
-  loyalty_commitment: number;
-  humility: number;
-  kaizen_growth: number;
+  communication: number;
+  clarity: number;
   cultural_fit: number;
+  problem_solving: number;
+}
+
+export interface TranscriptHistoryItem {
+  question_id: string;
+  question: string;
+  user_answer: string;
 }
 
 export interface TurnFeedback {
@@ -25,10 +30,10 @@ export interface FinalReport {
 }
 
 export interface FullResults {
-  radar: RadarScores;
-  report: FinalReport;
-  feedback: { turns: TurnFeedback[] };
-  transcript: { turns: { question_id: string; question: string; answer: string }[] };
+  radar_scores: RadarScores;
+  transcript: TranscriptHistoryItem[];
+  feedback: string;
+  hiring_signal: string;
 }
 
 // Real backend schema for session start
@@ -58,32 +63,31 @@ export interface TurnResponse {
 }
 
 export interface InterviewScores {
-  jiko_pr: number;
-  shibou_douki: number;
-  kyouchousei: number;
-  seichou_iyoku: number;
-  bunka_tekigou: number;
+  communication: number;
+  clarity: number;
+  cultural_fit: number;
+  problem_solving: number;
 }
 
 export interface InterviewTurnResponse {
-  agent_text: string;
-  is_wrapping_up: boolean;
-  interview_complete?: boolean;
-  scores?: InterviewScores;
+  next_question: string;
+  interviewer_response: string;
+  question_id: string;
+  scores: InterviewScores;
+  interview_complete: boolean;
 }
 
 export function mapInterviewScoresToRadar(scores: InterviewScores): RadarScores {
   return {
-    wa_teamwork: scores.kyouchousei,
-    loyalty_commitment: scores.shibou_douki,
-    humility: scores.jiko_pr,
-    kaizen_growth: scores.seichou_iyoku,
-    cultural_fit: scores.bunka_tekigou,
+    communication: scores.communication,
+    clarity: scores.clarity,
+    cultural_fit: scores.cultural_fit,
+    problem_solving: scores.problem_solving,
   };
 }
 
 export interface Transcript {
-  turns: { question_id: string; question: string; answer: string }[];
+  turns: TranscriptHistoryItem[];
 }
 
 export type ScoreLevel = "high" | "mid" | "low";
@@ -95,11 +99,10 @@ export function getScoreLevel(score: number): ScoreLevel {
 }
 
 export const DIMENSION_LABELS: Record<keyof RadarScores, string> = {
-  wa_teamwork: "和・Teamwork",
-  loyalty_commitment: "忠誠・Loyalty",
-  humility: "謙虚・Humility",
-  kaizen_growth: "改善・Growth",
-  cultural_fit: "文化・Culture",
+  communication: "Communication",
+  clarity: "Clarity",
+  cultural_fit: "Cultural Fit",
+  problem_solving: "Problem Solving",
 };
 
 export const COMPANIES = [
@@ -227,11 +230,10 @@ export function scoreAnswer(answer: string): RadarScores {
   const clamp = (v: number) => +Math.min(10, Math.max(1, v)).toFixed(1);
 
   return {
-    wa_teamwork: clamp(base + kw(["team", "together", "colleague", "collaborate", "support", "group", "member", "shared"])),
-    loyalty_commitment: clamp(base + kw(["commit", "dedicated", "long-term", "purpose", "mission", "contribute", "loyal", "stay"])),
-    humility: clamp(base + kw(["learn", "mistake", "feedback", "appreciate", "guidance", "improve", "reflect", "listen"])),
-    kaizen_growth: clamp(base + kw(["improve", "grow", "develop", "progress", "kaizen", "better", "efficiency", "optimize", "process"])),
-    cultural_fit: clamp(base + kw(["japan", "japanese", "culture", "adapt", "respect", "harmony", "tradition", "value", "philosophy"])),
+    communication: clamp(base + kw(["explain", "clearly", "articulate", "communicate", "describe", "express", "present"])),
+    clarity: clamp(base + kw(["specific", "clear", "concrete", "example", "detail", "precise", "structured", "focused"])),
+    cultural_fit: clamp(base + kw(["team", "collaborate", "culture", "value", "align", "adapt", "respect", "together", "harmony"])),
+    problem_solving: clamp(base + kw(["solve", "analyze", "approach", "strategy", "improve", "solution", "identify", "resolve", "optimize"])),
   };
 }
 
@@ -244,64 +246,28 @@ export function buildResults(
   name: string
 ): FullResults {
   const keys = Object.keys(turnScores[0]) as (keyof RadarScores)[];
-  const radar = Object.fromEntries(
+  const radar_scores = Object.fromEntries(
     keys.map((k) => [
       k,
       +(turnScores.reduce((s, t) => s + t[k], 0) / turnScores.length).toFixed(1),
     ])
   ) as unknown as RadarScores;
 
-  const turns: TurnFeedback[] = questions.map((q, i) => {
-    const scores = (turnScores[i] ?? {}) as RadarScores;
-    const values = Object.values(scores);
-    const avg =
-      values.length > 0
-        ? values.reduce((a, b) => a + b, 0) / values.length
-        : 0;
-    const feedback =
-      avg >= 7
-        ? "Strong answer. Clear cultural alignment and specific framing. The interviewer noted this positively."
-        : avg >= 5
-        ? "Adequate response. Adding more concrete examples and culturally-resonant language would elevate this significantly."
-        : "This answer needs more depth. Focus on specific situations, measurable outcomes, and explicit connection to company values.";
-
-    const rewrite = `A stronger version of this answer would: (1) open with a specific, real example, (2) explicitly name how it connects to ${company}'s values, and (3) close with what you personally learned or contributed. Keep it concise — under 90 seconds.`;
-
-    return {
-      question_id: `q${i + 1}`,
-      question: q,
-      answer: answers[i] || "[No speech detected]",
-      feedback,
-      rewrite,
-      scores,
-    };
-  });
-
-  const allEntries = Object.entries(radar) as [keyof RadarScores, number][];
-  const sorted = [...allEntries].sort((a, b) => b[1] - a[1]);
-  const topDims = sorted.slice(0, 2).map(([k]) => DIMENSION_LABELS[k]);
-  const weakDims = sorted.slice(-2).map(([k]) => DIMENSION_LABELS[k]);
-  const avgOverall = Object.values(radar).reduce((a, b) => a + b, 0) / 5;
-
-  const report: FinalReport = {
-    overall_summary: `${name} demonstrated ${avgOverall >= 7 ? "strong" : avgOverall >= 5 ? "developing" : "early-stage"} cultural readiness for ${company}. Communication was ${avgOverall >= 6 ? "clear and structured with notable moments of alignment" : "present, but would benefit substantially from more specific examples and culturally-aware framing"}.`,
-    strengths: topDims.map((d) => `${d} — shown through clear framing and relevant examples`),
-    improvement_areas: weakDims.map((d) => `${d} — needs more culturally-aligned language and concrete specifics`),
-    recommended_focus: `Practice framing all answers through ${company}'s core cultural lens. Your next session should focus on strengthening ${DIMENSION_LABELS[sorted[sorted.length - 1][0]]} alignment specifically.`,
-    company_flag: COMPANY_FLAGS[company] ?? `Research ${company}'s cultural pillars deeply and weave them naturally into every answer.`,
-    overall_scores: radar,
-  };
+  const avgOverall = Object.values(radar_scores).reduce((a, b) => a + b, 0) / 4;
+  const readiness = avgOverall >= 7 ? "strong" : avgOverall >= 5 ? "developing" : "early-stage";
 
   return {
-    radar,
-    report,
-    feedback: { turns },
-    transcript: {
-      turns: questions.map((q, i) => ({
-        question_id: `q${i + 1}`,
-        question: q,
-        answer: answers[i] || "",
-      })),
-    },
+    radar_scores,
+    transcript: questions.map((q, i) => ({
+      question_id: `q${i + 1}`,
+      question: q,
+      user_answer: answers[i] ?? "",
+    })),
+    feedback: `${name} demonstrated ${readiness} cultural readiness for ${company}. Communication was ${avgOverall >= 6 ? "clear and structured with notable moments of alignment" : "present but would benefit substantially from more specific examples and culturally-aware framing"}.`,
+    hiring_signal: avgOverall >= 7
+      ? "Strong candidate. Proceed to next round."
+      : avgOverall >= 5
+      ? "Potential candidate. Further evaluation recommended."
+      : "Not ready. Significant improvement needed before reapplication.",
   };
 }
