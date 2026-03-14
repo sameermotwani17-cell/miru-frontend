@@ -9,6 +9,7 @@ interface VoiceInputProps {
   onStartRecording: () => void;
   onStopRecording: () => void;
   disabled?: boolean;
+  statusText?: string;
 }
 
 export default function VoiceInput({
@@ -17,10 +18,9 @@ export default function VoiceInput({
   onStartRecording,
   onStopRecording,
   disabled = false,
+  statusText,
 }: VoiceInputProps) {
-  const barsRef = useRef<number[]>(
-    Array.from({ length: 20 }, () => Math.random() * 0.3 + 0.1)
-  );
+  const barsRef = useRef<number[]>(Array.from({ length: 20 }, () => 0.2));
   const animRef = useRef<number>(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -219,11 +219,12 @@ export default function VoiceInput({
           letterSpacing: "0.06em",
         }}
       >
-        {disabled
-          ? "Please wait…"
-          : isRecording
-          ? "Press to stop recording"
-          : "Press to speak"}
+        {statusText ??
+          (disabled
+            ? "Please wait..."
+            : isRecording
+            ? "Tap to stop recording"
+            : "Tap to speak")}
       </p>
     </div>
   );

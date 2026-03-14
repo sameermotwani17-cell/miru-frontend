@@ -15,7 +15,7 @@ const slideVariants = {
   exit: (dir: number) => ({ x: dir < 0 ? 60 : -60, opacity: 0 }),
 };
 
-type LanguageMode = "japanese" | "english";
+type LanguageMode = "jp" | "english";
 type DurationMode = "demo" | "15min" | "30min" | "45min" | "full";
 
 interface DurationOption {
@@ -137,6 +137,7 @@ export default function OnboardingPage() {
     setLoading(true);
 
     const selectedDuration = DURATION_OPTIONS.find((o) => o.id === durationMode)!;
+    const backendCompany = selectedCompany.trim().toLowerCase();
     // Send 0 for "unlimited" so backend doesn't fail on null
     const targetQuestions = selectedDuration.questions ?? 0;
 
@@ -144,7 +145,7 @@ export default function OnboardingPage() {
       const res = await startInterview({
         user_name: name,
         target_role: role,
-        company: selectedCompany,
+        company: backendCompany,
         language_mode: languageMode,
         duration_mins: selectedDuration.durationMins,
       });
@@ -496,7 +497,7 @@ export default function OnboardingPage() {
                       {(
                         [
                           { value: "english", label: "English", sub: "HR Mode" },
-                          { value: "japanese", label: "Japanese", sub: "日本語モード" },
+                          { value: "jp", label: "Japanese", sub: "日本語モード" },
                         ] as const
                       ).map((opt) => (
                         <ToggleButton

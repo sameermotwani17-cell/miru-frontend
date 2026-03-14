@@ -57,6 +57,30 @@ export interface TurnResponse {
   question_number: number;
 }
 
+export interface InterviewScores {
+  jiko_pr: number;
+  shibou_douki: number;
+  kyouchousei: number;
+  seichou_iyoku: number;
+  bunka_tekigou: number;
+}
+
+export interface InterviewTurnResponse {
+  agent_text: string;
+  is_wrapping_up: boolean;
+  scores?: InterviewScores;
+}
+
+export function mapInterviewScoresToRadar(scores: InterviewScores): RadarScores {
+  return {
+    wa_teamwork: scores.kyouchousei,
+    loyalty_commitment: scores.shibou_douki,
+    humility: scores.jiko_pr,
+    kaizen_growth: scores.seichou_iyoku,
+    cultural_fit: scores.bunka_tekigou,
+  };
+}
+
 export interface Transcript {
   turns: { question_id: string; question: string; answer: string }[];
 }

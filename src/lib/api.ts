@@ -2,11 +2,25 @@ import type {
   StartPayload,
   StartResponse,
   TurnResponse,
+  InterviewTurnResponse,
   FullResults,
   RadarScores,
   FinalReport,
   Transcript,
 } from "./types";
+
+function normalizeCompanyForBackend(company: string): string {
+  const raw = company.trim().toLowerCase();
+  const map: Record<string, string> = {
+    toyota: "toyota",
+    rakuten: "rakuten",
+    sony: "sony",
+    softbank: "softbank",
+    uniqlo: "uniqlo",
+  };
+
+  return map[raw] ?? raw;
+}
 
 const BASE = process.env.NEXT_PUBLIC_API_URL;
 
@@ -55,12 +69,57 @@ export async function startInterview(
 
 export async function submitTurn(
   sessionId: string,
-  answer: string
+  answer: string,
+  languageMode: string
 ): Promise<TurnResponse> {
   return request<TurnResponse>("/api/interview/turn", {
     method: "POST",
-    body: JSON.stringify({ session_id: sessionId, user_answer: answer }),
+    body: JSON.stringify({
+      session_id: sessionId,
+      user_answer: answer,
+      language_mode: languageMode,
+      user_message: answer,
+    }),
   });
+}
+
+export async function sendInterviewTurn(
+  message: string,
+  sessionId: string,
+  company: string
+): Promise<InterviewTurnResponse> {
+  const normalizedCompany = normalizeCompanyForBackend(company);
+  const normalizedMessage = message.trim().length === 0 ? "start" : message;
+
+  const response = await fetch(
+    "https://miru-backend-production.up.railway.app/api/interview/turn",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        session_id: sessionId,
+        user_message: normalizedMessage,
+        company: normalizedCompany,
+        language_mode: "en",
+        duration_mins: 15,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    let messageText = `HTTP ${response.status}`;
+    try {
+      const body = await response.json();
+      messageText = body.detail ?? body.message ?? messageText;
+    } catch {
+      // ignore parse errors
+    }
+    throw new ApiError(response.status, messageText);
+  }
+
+  return response.json() as Promise<InterviewTurnResponse>;
 }
 
 export async function getResults(sessionId: string): Promise<FullResults> {

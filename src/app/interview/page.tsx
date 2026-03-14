@@ -1,127 +1,409 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useReducer, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import MiruLogo from "@/components/MiruLogo";
 import HRAvatar from "@/components/HRAvatar";
 import VoiceInput from "@/components/VoiceInput";
 import { session } from "@/lib/session";
+import { speak } from "@/lib/tts";
+import { sendInterviewTurn } from "@/lib/api";
 import {
-  COMPANY_QUESTIONS,
-  DEFAULT_QUESTIONS,
-  MIRU_REACTIONS,
-  scoreAnswer,
+  startSpeechRecognition,
+  type SpeechRecognitionInstance,
+} from "@/lib/voice";
+import {
   buildResults,
+  mapInterviewScoresToRadar,
+  scoreAnswer,
+  type InterviewScores,
+  type RadarScores,
 } from "@/lib/types";
-import type { RadarScores } from "@/lib/types";
 
-type InterviewState =
-  | "idle"
-  | "listening"
-  | "processing"
-  | "speaking"
-  | "complete";
+type MachineStatus =
+  | "IDLE"
+  | "STARTING"
+  | "QUESTION"
+  | "LISTENING"
+  | "TRANSCRIBING"
+  | "WAITING_RESPONSE"
+  | "WRAP_UP"
+  | "COMPLETED"
+  | "ERROR";
 
-interface SpeechRecognitionEvent extends Event {
-  results: SpeechRecognitionResultList;
-}
+type ChatMessage = {
+  role: "user" | "agent";
+  text: string;
+};
 
-interface SpeechRecognitionErrorEvent extends Event {
+type MachineState = {
+  status: MachineStatus;
+  sessionId: string;
+  company: string;
+  languageMode: string;
+  messages: ChatMessage[];
+  latestScores: InterviewScores | null;
   error: string;
+  turnCount: number;
+};
+
+type MachineAction =
+  | { type: "SET_CONTEXT"; sessionId: string; company: string; languageMode: string }
+  | { type: "STARTING" }
+  | { type: "QUESTION_READY"; agentText: string; scores?: InterviewScores; isFirst: boolean }
+  | { type: "LISTENING" }
+  | { type: "TRANSCRIBING" }
+  | { type: "WAITING_RESPONSE"; userText: string; appendUser: boolean }
+  | { type: "WRAP_UP" }
+  | { type: "COMPLETED" }
+  | { type: "ERROR"; error: string }
+  | { type: "RETRY_FROM_ERROR" };
+
+const initialMachineState: MachineState = {
+  status: "IDLE",
+  sessionId: "",
+  company: "rakuten",
+  languageMode: "en",
+  messages: [],
+  latestScores: null,
+  error: "",
+  turnCount: 0,
+};
+
+const RETRY_BASE_DELAY_MS = 450;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-declare global {
-  interface Window {
-    SpeechRecognition: new () => SpeechRecognitionInstance;
-    webkitSpeechRecognition: new () => SpeechRecognitionInstance;
+function interviewReducer(state: MachineState, action: MachineAction): MachineState {
+  switch (action.type) {
+    case "SET_CONTEXT":
+      return {
+        ...state,
+        sessionId: action.sessionId,
+        company: action.company,
+        languageMode: action.languageMode,
+      };
+    case "STARTING":
+      return {
+        ...state,
+        status: "STARTING",
+        error: "",
+      };
+    case "QUESTION_READY":
+      return {
+        ...state,
+        status: "QUESTION",
+        error: "",
+        latestScores: action.scores ?? state.latestScores,
+        messages: action.isFirst
+          ? [{ role: "agent", text: action.agentText }]
+          : [...state.messages, { role: "agent", text: action.agentText }],
+      };
+    case "LISTENING":
+      return {
+        ...state,
+        status: "LISTENING",
+        error: "",
+      };
+    case "TRANSCRIBING":
+      return {
+        ...state,
+        status: "TRANSCRIBING",
+        error: "",
+      };
+    case "WAITING_RESPONSE":
+      return {
+        ...state,
+        status: "WAITING_RESPONSE",
+        error: "",
+        turnCount: action.appendUser ? state.turnCount + 1 : state.turnCount,
+        messages: action.appendUser
+          ? [...state.messages, { role: "user", text: action.userText }]
+          : state.messages,
+      };
+    case "WRAP_UP":
+      return {
+        ...state,
+        status: "WRAP_UP",
+      };
+    case "COMPLETED":
+      return {
+        ...state,
+        status: "COMPLETED",
+      };
+    case "ERROR":
+      return {
+        ...state,
+        status: "ERROR",
+        error: action.error,
+      };
+    case "RETRY_FROM_ERROR":
+      return {
+        ...state,
+        status: state.messages.length ? "QUESTION" : "STARTING",
+        error: "",
+      };
+    default:
+      return state;
   }
-}
-
-interface SpeechRecognitionInstance extends EventTarget {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  start: () => void;
-  stop: () => void;
-  onresult: ((ev: SpeechRecognitionEvent) => void) | null;
-  onerror: ((ev: SpeechRecognitionErrorEvent) => void) | null;
-  onend: (() => void) | null;
 }
 
 export default function InterviewPage() {
   const router = useRouter();
+  const [machine, dispatch] = useReducer(interviewReducer, initialMachineState);
 
-  const [interviewState, setInterviewState] = useState<InterviewState>("idle");
-  const [questions, setQuestions] = useState<string[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
   const [transcript, setTranscript] = useState("");
-  const [reaction, setReaction] = useState("");
-  const [error, setError] = useState("");
+  const [lastTranscript, setLastTranscript] = useState("");
   const [timerSeconds, setTimerSeconds] = useState(0);
-  const [timerMaxSecs, setTimerMaxSecs] = useState(0); // 0 = count up (unlimited)
+  const [timerMaxSecs, setTimerMaxSecs] = useState(0);
   const [durationId, setDurationId] = useState("");
-  const [company, setCompany] = useState("");
-  const [isComplete, setIsComplete] = useState(false);
 
+  const askedQuestionsRef = useRef<string[]>([]);
   const answersRef = useRef<string[]>([]);
   const turnScoresRef = useRef<RadarScores[]>([]);
-  const questionsRef = useRef<string[]>([]);
-  const currentIndexRef = useRef(0);
+
   const transcriptRef = useRef("");
+  const statusRef = useRef<MachineStatus>("IDLE");
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
-  const stateRef = useRef<InterviewState>("idle");
-  const autoCompleteRef = useRef(false); // guard against double-completion
-  stateRef.current = interviewState;
+  const submitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const transcriptPreviewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const startedRef = useRef(false);
+  const completingRef = useRef(false);
+  const requestInFlightRef = useRef(false);
+  const pendingRequestRef = useRef<{ kind: "start" | "answer"; answer: string } | null>(null);
 
   useEffect(() => {
-    const id = session.getSessionId();
-    const comp = session.getCompany() ?? "";
-    const name = session.getCandidateName() ?? "";
-    const durId = session.getDurationMode() ?? "demo";
-    const targetCount = session.getQuestionCountTarget();
+    statusRef.current = machine.status;
+  }, [machine.status]);
 
-    if (!id) {
-      router.push("/onboarding");
+  const sendTurnWithRetry = useCallback(
+    async (userMessage: string) => {
+      const maxAttempts = 3;
+      let lastError: unknown = null;
+
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+          return await sendInterviewTurn(userMessage, machine.sessionId, machine.company);
+        } catch (err) {
+          lastError = err;
+          if (attempt === maxAttempts) {
+            break;
+          }
+          const jitter = Math.floor(Math.random() * 120);
+          const delay = RETRY_BASE_DELAY_MS * 2 ** (attempt - 1) + jitter;
+          await sleep(delay);
+        }
+      }
+
+      throw lastError instanceof Error
+        ? lastError
+        : new Error("Turn request failed after retries.");
+    },
+    [machine.sessionId, machine.company]
+  );
+
+  const finalizeInterview = useCallback(() => {
+    if (completingRef.current) {
+      return;
+    }
+    completingRef.current = true;
+
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
+
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    if (!askedQuestionsRef.current.length && machine.messages.length) {
+      askedQuestionsRef.current = machine.messages
+        .filter((m) => m.role === "agent")
+        .map((m) => m.text);
+    }
+
+    if (askedQuestionsRef.current.length > answersRef.current.length) {
+      const missing = askedQuestionsRef.current.length - answersRef.current.length;
+      for (let i = 0; i < missing; i++) {
+        answersRef.current.push("[No speech detected]");
+      }
+    }
+
+    if (!turnScoresRef.current.length && answersRef.current.length) {
+      turnScoresRef.current = answersRef.current.map((a) => scoreAnswer(a));
+    }
+
+    const results = buildResults(
+      askedQuestionsRef.current.length
+        ? askedQuestionsRef.current
+        : ["Interview"],
+      answersRef.current.length
+        ? answersRef.current
+        : ["[No speech detected]"],
+      turnScoresRef.current.length
+        ? turnScoresRef.current
+        : [scoreAnswer("[No speech detected]")],
+      machine.company,
+      session.getCandidateName() ?? ""
+    );
+
+    session.setResults(results);
+    session.setInterviewComplete(true);
+    dispatch({ type: "COMPLETED" });
+  }, [machine.messages, machine.company]);
+
+  const executeStartTurn = useCallback(async () => {
+    if (requestInFlightRef.current || startedRef.current || !machine.sessionId) {
       return;
     }
 
-    setCompany(comp);
+    startedRef.current = true;
+    requestInFlightRef.current = true;
+    pendingRequestRef.current = { kind: "start", answer: "start" };
+    dispatch({ type: "STARTING" });
+
+    try {
+      const res = await sendTurnWithRetry("start");
+      const firstPrompt = res.agent_text?.trim() || "Please introduce yourself.";
+      askedQuestionsRef.current = [firstPrompt];
+
+      dispatch({
+        type: "QUESTION_READY",
+        agentText: firstPrompt,
+        scores: res.scores,
+        isFirst: true,
+      });
+
+      speak(firstPrompt, machine.languageMode === "jp" ? "ja-JP" : "en-US");
+
+      if (res.is_wrapping_up) {
+        dispatch({ type: "WRAP_UP" });
+        finalizeInterview();
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to start interview.";
+      dispatch({ type: "ERROR", error: msg });
+      startedRef.current = false;
+    } finally {
+      requestInFlightRef.current = false;
+    }
+  }, [machine.sessionId, machine.languageMode, sendTurnWithRetry, finalizeInterview]);
+
+  const executeAnswerTurn = useCallback(
+    async (answer: string, appendUser: boolean) => {
+      if (
+        requestInFlightRef.current ||
+        !machine.sessionId ||
+        machine.status === "WRAP_UP" ||
+        machine.status === "COMPLETED"
+      ) {
+        return;
+      }
+
+      const safeAnswer = answer.trim() || "[No speech detected]";
+      requestInFlightRef.current = true;
+      pendingRequestRef.current = { kind: "answer", answer: safeAnswer };
+
+      if (appendUser) {
+        setLastTranscript(safeAnswer);
+        if (transcriptPreviewTimeoutRef.current) {
+          clearTimeout(transcriptPreviewTimeoutRef.current);
+        }
+        transcriptPreviewTimeoutRef.current = setTimeout(() => {
+          setLastTranscript("");
+        }, 2800);
+      }
+
+      dispatch({ type: "WAITING_RESPONSE", userText: safeAnswer, appendUser });
+
+      if (appendUser) {
+        answersRef.current.push(safeAnswer);
+      }
+
+      try {
+        const res = await sendTurnWithRetry(safeAnswer);
+        const nextPrompt = res.agent_text?.trim() || "Thank you.";
+
+        askedQuestionsRef.current.push(nextPrompt);
+
+        const mappedScores = res.scores
+          ? mapInterviewScoresToRadar(res.scores)
+          : scoreAnswer(safeAnswer);
+        if (appendUser) {
+          turnScoresRef.current.push(mappedScores);
+        }
+
+        dispatch({
+          type: "QUESTION_READY",
+          agentText: nextPrompt,
+          scores: res.scores,
+          isFirst: false,
+        });
+
+        if (!res.is_wrapping_up) {
+          speak(nextPrompt, machine.languageMode === "jp" ? "ja-JP" : "en-US");
+        } else {
+          dispatch({ type: "WRAP_UP" });
+          finalizeInterview();
+        }
+
+        setTranscript("");
+        transcriptRef.current = "";
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Temporary network issue. Please try again.";
+        dispatch({ type: "ERROR", error: msg });
+      } finally {
+        requestInFlightRef.current = false;
+      }
+    },
+    [machine.sessionId, machine.status, machine.languageMode, sendTurnWithRetry, finalizeInterview]
+  );
+
+  useEffect(() => {
+    let id = session.getSessionId();
+    const company = session.getCompany() ?? "rakuten";
+    const languageMode = session.getLanguageMode() ?? "en";
+    const durId = session.getDurationMode() ?? "demo";
+
+    if (!id) {
+      id = `miru-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+      session.setSessionId(id);
+    }
+
+    if (!session.getCompany()) {
+      session.setCompany(company);
+    }
+
+    dispatch({
+      type: "SET_CONTEXT",
+      sessionId: id,
+      company,
+      languageMode,
+    });
+
     setDurationId(durId);
 
-    const allQuestions = COMPANY_QUESTIONS[comp] ?? DEFAULT_QUESTIONS;
-
-    // Cap question count at available questions
-    let qs: string[];
-    if (targetCount === null || targetCount === 0) {
-      qs = allQuestions; // full / unlimited
-    } else {
-      qs = allQuestions.slice(0, Math.min(targetCount, allQuestions.length));
-    }
-    setQuestions(qs);
-    questionsRef.current = qs;
-
-    // Store name for result building (referenced via session)
-    void name;
-
-    // Set up timer
     const maxSecs =
-      durId === "demo"   ? 180  :
-      durId === "15min"  ? 900  :
-      durId === "30min"  ? 1800 :
-      durId === "45min"  ? 2700 : 0; // "full" = 0 = count up
+      durId === "demo" ? 180 :
+      durId === "15min" ? 900 :
+      durId === "30min" ? 1800 :
+      durId === "45min" ? 2700 : 0;
 
     setTimerMaxSecs(maxSecs);
 
     if (maxSecs > 0) {
-      // countdown
       setTimerSeconds(maxSecs);
       timerRef.current = setInterval(() => {
         setTimerSeconds((s) => Math.max(0, s - 1));
       }, 1000);
     } else {
-      // count up
       setTimerSeconds(0);
       timerRef.current = setInterval(() => {
         setTimerSeconds((s) => s + 1);
@@ -129,54 +411,100 @@ export default function InterviewPage() {
     }
 
     return () => {
+      if (submitTimeoutRef.current) clearTimeout(submitTimeoutRef.current);
+      if (transcriptPreviewTimeoutRef.current) clearTimeout(transcriptPreviewTimeoutRef.current);
       if (timerRef.current) clearInterval(timerRef.current);
       if (recognitionRef.current) recognitionRef.current.stop();
+      if (typeof window !== "undefined") {
+        window.speechSynthesis?.cancel();
+      }
     };
-  }, [router]);
+  }, []);
 
-  // Auto-complete when countdown hits zero
   useEffect(() => {
-    if (
-      timerMaxSecs > 0 &&
-      timerSeconds === 0 &&
-      !isComplete &&
-      !autoCompleteRef.current &&
-      questionsRef.current.length > 0
-    ) {
-      autoCompleteRef.current = true;
-
-      // Stop any active recording
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-        recognitionRef.current = null;
-      }
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-
-      // Build results from however many answers we have so far
-      const qs = questionsRef.current;
-      const answeredQs = qs.slice(0, Math.max(1, currentIndexRef.current + 1));
-      const answeredAnswers = answersRef.current;
-      const answeredScores = turnScoresRef.current;
-
-      // Fill missing answers/scores
-      for (let i = 0; i < answeredQs.length; i++) {
-        if (!answeredAnswers[i]) answeredAnswers[i] = "[No speech detected]";
-        if (!answeredScores[i]) answeredScores[i] = scoreAnswer(answeredAnswers[i]);
-      }
-
-      const comp = session.getCompany() ?? "";
-      const name = session.getCandidateName() ?? "";
-      const results = buildResults(answeredQs, answeredAnswers, answeredScores, comp, name);
-      session.setResults(results);
-      session.setInterviewComplete(true);
-
-      setIsComplete(true);
-      setTimeout(() => router.push("/debrief"), 2500);
+    if (machine.status === "IDLE" && machine.sessionId) {
+      void executeStartTurn();
     }
-  }, [timerSeconds, timerMaxSecs, isComplete, router]);
+  }, [machine.status, machine.sessionId, executeStartTurn]);
+
+  useEffect(() => {
+    if (timerMaxSecs > 0 && timerSeconds === 0 && machine.status !== "COMPLETED") {
+      dispatch({ type: "WRAP_UP" });
+      finalizeInterview();
+    }
+  }, [timerSeconds, timerMaxSecs, machine.status, finalizeInterview]);
+
+  const startRecording = useCallback(() => {
+    if (machine.status !== "QUESTION") {
+      return;
+    }
+
+    setTranscript("");
+    transcriptRef.current = "";
+    dispatch({ type: "LISTENING" });
+
+    const recognition = startSpeechRecognition(
+      (text) => {
+        setTranscript(text);
+        transcriptRef.current = text;
+      },
+      {
+        lang: machine.languageMode === "jp" ? "ja-JP" : "en-US",
+        onError: (message) => {
+          dispatch({ type: "ERROR", error: message });
+        },
+        onEnd: () => {
+          if (statusRef.current === "LISTENING") {
+            dispatch({ type: "TRANSCRIBING" });
+            submitTimeoutRef.current = setTimeout(() => {
+              void executeAnswerTurn(transcriptRef.current, true);
+            }, 220);
+          }
+        },
+      }
+    );
+
+    if (!recognition) {
+      return;
+    }
+
+    recognitionRef.current = recognition;
+  }, [machine.status, machine.languageMode, executeAnswerTurn]);
+
+  const stopRecordingFull = useCallback(() => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
+
+    if (statusRef.current === "LISTENING") {
+      dispatch({ type: "TRANSCRIBING" });
+      submitTimeoutRef.current = setTimeout(() => {
+        void executeAnswerTurn(transcriptRef.current, true);
+      }, 160);
+    }
+  }, [executeAnswerTurn]);
+
+  const retryFailedRequest = useCallback(() => {
+    const pending = pendingRequestRef.current;
+    if (!pending || requestInFlightRef.current) {
+      return;
+    }
+
+    dispatch({ type: "RETRY_FROM_ERROR" });
+
+    if (pending.kind === "start") {
+      startedRef.current = false;
+      void executeStartTurn();
+      return;
+    }
+
+    void executeAnswerTurn(pending.answer, false);
+  }, [executeStartTurn, executeAnswerTurn]);
+
+  const openDebrief = useCallback(() => {
+    router.push("/debrief");
+  }, [router]);
 
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60);
@@ -184,108 +512,34 @@ export default function InterviewPage() {
     return `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
   };
 
-  const startRecording = useCallback(() => {
-    setTranscript("");
-    transcriptRef.current = "";
-    setError("");
-
-    const SpeechRecognition =
-      window.SpeechRecognition ?? window.webkitSpeechRecognition;
-
-    if (!SpeechRecognition) {
-      setError("Speech recognition not supported. Please use Chrome.");
-      return;
-    }
-
-    const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = "en-US";
-
-    recognition.onresult = (ev: SpeechRecognitionEvent) => {
-      let final = "";
-      for (let i = 0; i < ev.results.length; i++) {
-        if (ev.results[i].isFinal) final += ev.results[i][0].transcript;
-      }
-      if (final) {
-        setTranscript(final);
-        transcriptRef.current = final;
-      }
-    };
-
-    recognition.onerror = (ev: SpeechRecognitionErrorEvent) => {
-      if (ev.error !== "aborted") setError(`Recording error: ${ev.error}`);
-      setInterviewState("idle");
-    };
-
-    recognition.onend = () => {
-      if (stateRef.current === "listening") setInterviewState("idle");
-    };
-
-    recognition.start();
-    recognitionRef.current = recognition;
-    setInterviewState("listening");
-  }, []);
-
-  const submitAnswer = useCallback(() => {
-    const answer = transcriptRef.current || "[No speech detected]";
-    const idx = currentIndexRef.current;
-    const qs = questionsRef.current;
-
-    const scores = scoreAnswer(answer);
-    answersRef.current[idx] = answer;
-    turnScoresRef.current[idx] = scores;
-
-    const reactionText = MIRU_REACTIONS[idx % MIRU_REACTIONS.length];
-    setReaction(reactionText);
-    setInterviewState("speaking");
-
-    const isLast = idx >= qs.length - 1;
-    const delay = Math.max(2500, reactionText.length * 45);
-
-    setTimeout(() => {
-      if (isLast) {
-        const comp = session.getCompany() ?? "";
-        const name = session.getCandidateName() ?? "";
-        const results = buildResults(
-          qs,
-          answersRef.current,
-          turnScoresRef.current,
-          comp,
-          name
-        );
-        session.setResults(results);
-        session.setInterviewComplete(true);
-
-        if (timerRef.current) clearInterval(timerRef.current);
-        setIsComplete(true);
-        setTimeout(() => router.push("/debrief"), 2500);
-      } else {
-        const nextIdx = idx + 1;
-        currentIndexRef.current = nextIdx;
-        setCurrentIndex(nextIdx);
-        setTranscript("");
-        transcriptRef.current = "";
-        setReaction("");
-        setInterviewState("idle");
-      }
-    }, delay);
-  }, [router]);
-
-  const stopRecordingFull = useCallback(() => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-      recognitionRef.current = null;
-    }
-    setInterviewState("processing");
-    setTimeout(submitAnswer, 400);
-  }, [submitAnswer]);
-
-  const currentQuestion = questions[currentIndex] ?? "";
-
-  // Timer color: warn when ≤ 60s remaining on countdown
   const isTimerWarning = timerMaxSecs > 0 && timerSeconds <= 60 && timerSeconds > 0;
   const isTimerCritical = timerMaxSecs > 0 && timerSeconds <= 20 && timerSeconds > 0;
+
+  const isThinking = machine.status === "STARTING" || machine.status === "WAITING_RESPONSE";
+  const inputDisabled =
+    machine.status === "STARTING" ||
+    machine.status === "TRANSCRIBING" ||
+    machine.status === "WAITING_RESPONSE" ||
+    machine.status === "WRAP_UP" ||
+    machine.status === "COMPLETED";
+
+  const avatarState =
+    machine.status === "LISTENING"
+      ? "listening"
+      : machine.status === "TRANSCRIBING" || machine.status === "WAITING_RESPONSE" || machine.status === "STARTING"
+      ? "processing"
+      : machine.status === "QUESTION"
+      ? "speaking"
+      : "idle";
+
+  const statusText =
+    machine.status === "LISTENING"
+      ? "Listening..."
+      : machine.status === "TRANSCRIBING"
+      ? "Transcribing..."
+      : machine.status === "WAITING_RESPONSE" || machine.status === "STARTING"
+      ? "MIRU is thinking..."
+      : "Tap mic and speak";
 
   return (
     <div
@@ -296,10 +550,9 @@ export default function InterviewPage() {
         display: "flex",
         flexDirection: "column",
         position: "relative",
-        backgroundColor: "#050508", // hard-stop — never show light canvas through
+        backgroundColor: "#050508",
       }}
     >
-      {/* Top bar */}
       <div
         style={{
           display: "flex",
@@ -323,7 +576,7 @@ export default function InterviewPage() {
               color: "#8888aa",
             }}
           >
-            {company}
+            {machine.company}
           </span>
 
           <span
@@ -334,7 +587,7 @@ export default function InterviewPage() {
               fontWeight: 600,
             }}
           >
-            Q{currentIndex + 1} / {questions.length || "…"}
+            Turns: {machine.turnCount}
           </span>
 
           <span
@@ -351,10 +604,10 @@ export default function InterviewPage() {
               transition: "color 0.3s",
             }}
           >
-            {timerMaxSecs > 0 ? "⏱ " : ""}{formatTime(timerSeconds)}
+            {timerMaxSecs > 0 ? "Time left: " : "Elapsed: "}
+            {formatTime(timerSeconds)}
           </span>
 
-          {/* Duration badge */}
           {durationId === "demo" && (
             <span
               style={{
@@ -372,27 +625,9 @@ export default function InterviewPage() {
               DEMO
             </span>
           )}
-          {durationId === "full" && (
-            <span
-              style={{
-                padding: "4px 10px",
-                borderRadius: 6,
-                background: "rgba(239,68,68,0.15)",
-                border: "1px solid rgba(239,68,68,0.3)",
-                color: "#ef4444",
-                fontSize: 11,
-                fontFamily: "var(--font-body)",
-                fontWeight: 600,
-                letterSpacing: "0.08em",
-              }}
-            >
-              FULL THROTTLE
-            </span>
-          )}
         </div>
       </div>
 
-      {/* Main content */}
       <div
         style={{
           flex: 1,
@@ -400,94 +635,140 @@ export default function InterviewPage() {
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "32px 24px 40px",
-          maxWidth: 700,
+          padding: "24px",
+          maxWidth: 760,
           margin: "0 auto",
           width: "100%",
+          gap: 14,
         }}
       >
-        <HRAvatar
-          state={
-            interviewState === "idle"
-              ? "idle"
-              : interviewState === "listening"
-              ? "listening"
-              : interviewState === "processing"
-              ? "processing"
-              : "speaking"
-          }
-        />
+        <HRAvatar state={avatarState} />
 
-        <div style={{ textAlign: "center", maxWidth: 580, width: "100%" }}>
-          <AnimatePresence mode="wait">
-            {interviewState === "speaking" ? (
-              <motion.div
-                key="reaction"
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -12 }}
-                transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+        <p
+          style={{
+            fontFamily: "var(--font-body)",
+            fontSize: 13,
+            color: "#a8a9c7",
+            letterSpacing: "0.06em",
+            textTransform: "uppercase",
+          }}
+        >
+          {statusText}
+        </p>
+
+        <div
+          className="glass-card"
+          style={{
+            width: "100%",
+            flex: 1,
+            overflowY: "auto",
+            padding: "16px",
+            borderRadius: 14,
+            border: "1px solid var(--border-subtle)",
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
+          }}
+        >
+          {machine.messages.map((m, idx) => (
+            <div
+              key={`${m.role}-${idx}`}
+              style={{
+                alignSelf: m.role === "user" ? "flex-end" : "flex-start",
+                maxWidth: "80%",
+                padding: "10px 14px",
+                borderRadius: 12,
+                background:
+                  m.role === "user"
+                    ? "rgba(108,99,255,0.18)"
+                    : "rgba(255,255,255,0.06)",
+                border:
+                  m.role === "user"
+                    ? "1px solid rgba(108,99,255,0.35)"
+                    : "1px solid rgba(255,255,255,0.1)",
+                color: "#f0f0ff",
+                fontFamily: "var(--font-body)",
+                fontSize: 14,
+                lineHeight: 1.5,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 11,
+                  letterSpacing: "0.08em",
+                  color: "#9fa0c3",
+                  marginBottom: 4,
+                }}
               >
-                <p
-                  style={{
-                    fontFamily: "var(--font-body)",
-                    fontSize: 11,
-                    color: "var(--accent-secondary)",
-                    letterSpacing: "0.12em",
-                    marginBottom: 12,
-                  }}
-                >
-                  MIRU SAYS
-                </p>
-                <p
-                  style={{
-                    fontFamily: "var(--font-display)",
-                    fontSize: "clamp(16px, 2.5vw, 22px)",
-                    color: "#f0f0ff",
-                    lineHeight: 1.55,
-                    fontWeight: 400,
-                  }}
-                >
-                  {reaction}
-                </p>
-              </motion.div>
-            ) : (
-              <motion.div
-                key={`question-${currentIndex}`}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -12 }}
-                transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-              >
-                <p
-                  style={{
-                    fontFamily: "var(--font-body)",
-                    fontSize: 11,
-                    color: "#8888aa",
-                    letterSpacing: "0.12em",
-                    marginBottom: 12,
-                  }}
-                >
-                  QUESTION {currentIndex + 1}
-                </p>
-                <p
-                  style={{
-                    fontFamily: "var(--font-display)",
-                    fontSize: "clamp(18px, 2.8vw, 26px)",
-                    color: "#f0f0ff",
-                    lineHeight: 1.5,
-                    fontWeight: 500,
-                  }}
-                >
-                  {currentQuestion}
-                </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                {m.role === "user" ? "YOU" : "MIRU"}
+              </div>
+              {m.text}
+            </div>
+          ))}
+
+          {isThinking && (
+            <div
+              style={{
+                alignSelf: "flex-start",
+                maxWidth: "70%",
+                padding: "10px 14px",
+                borderRadius: 12,
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.1)",
+                color: "#a8a9c7",
+                fontFamily: "var(--font-body)",
+                fontSize: 13,
+              }}
+            >
+              MIRU is thinking...
+            </div>
+          )}
         </div>
 
+        {lastTranscript && (
+          <div
+            className="glass-card"
+            style={{
+              width: "100%",
+              padding: "10px 12px",
+              borderRadius: 10,
+              border: "1px solid rgba(255,255,255,0.12)",
+              color: "#c8c9e6",
+              fontFamily: "var(--font-body)",
+              fontSize: 13,
+            }}
+          >
+            <span style={{ color: "#9fa0c3", marginRight: 8 }}>You said:</span>
+            &quot;{lastTranscript}&quot;
+          </div>
+        )}
+
+        {machine.latestScores && (
+          <div
+            className="glass-card"
+            style={{
+              width: "100%",
+              padding: "12px 14px",
+              borderRadius: 12,
+              border: "1px solid var(--border-subtle)",
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+              gap: 10,
+              fontFamily: "var(--font-body)",
+              fontSize: 13,
+              color: "#c8c9e6",
+            }}
+          >
+            <div>Self PR: {machine.latestScores.jiko_pr}</div>
+            <div>Motivation: {machine.latestScores.shibou_douki}</div>
+            <div>Teamwork: {machine.latestScores.kyouchousei}</div>
+            <div>Growth: {machine.latestScores.seichou_iyoku}</div>
+            <div>Culture fit: {machine.latestScores.bunka_tekigou}</div>
+          </div>
+        )}
+
         <AnimatePresence>
-          {error && (
+          {machine.status === "ERROR" && machine.error && (
             <motion.div
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
@@ -499,27 +780,45 @@ export default function InterviewPage() {
                 color: "var(--accent-warm)",
                 fontSize: 13,
                 fontFamily: "var(--font-body)",
-                maxWidth: 440,
+                maxWidth: 620,
                 textAlign: "center",
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
               }}
             >
-              {error}
+              <span>{machine.error}</span>
+              <button
+                onClick={retryFailedRequest}
+                style={{
+                  alignSelf: "center",
+                  padding: "8px 14px",
+                  borderRadius: 8,
+                  border: "1px solid rgba(255,255,255,0.2)",
+                  background: "rgba(255,255,255,0.08)",
+                  color: "#f0f0ff",
+                  fontSize: 12,
+                  fontFamily: "var(--font-body)",
+                  cursor: "pointer",
+                }}
+              >
+                Retry Request
+              </button>
             </motion.div>
           )}
         </AnimatePresence>
 
         <VoiceInput
-          isRecording={interviewState === "listening"}
+          isRecording={machine.status === "LISTENING"}
           transcript={transcript}
           onStartRecording={startRecording}
           onStopRecording={stopRecordingFull}
-          disabled={interviewState === "processing" || interviewState === "speaking"}
+          disabled={inputDisabled}
         />
       </div>
 
-      {/* Complete overlay */}
       <AnimatePresence>
-        {isComplete && (
+        {machine.status === "COMPLETED" && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -552,21 +851,44 @@ export default function InterviewPage() {
                   marginBottom: 12,
                 }}
               >
-                Interview Complete
+                Interview finished
               </h2>
-              <p
+
+              {machine.latestScores && (
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(2, minmax(150px, 1fr))",
+                    gap: 8,
+                    color: "#c8c9e6",
+                    fontFamily: "var(--font-body)",
+                    fontSize: 13,
+                    textAlign: "left",
+                    marginBottom: 16,
+                  }}
+                >
+                  <div>Self PR: {machine.latestScores.jiko_pr}</div>
+                  <div>Motivation: {machine.latestScores.shibou_douki}</div>
+                  <div>Teamwork: {machine.latestScores.kyouchousei}</div>
+                  <div>Growth: {machine.latestScores.seichou_iyoku}</div>
+                  <div>Culture fit: {machine.latestScores.bunka_tekigou}</div>
+                </div>
+              )}
+
+              <button
+                onClick={openDebrief}
                 style={{
+                  padding: "10px 16px",
+                  borderRadius: 10,
+                  border: "1px solid rgba(108,99,255,0.55)",
+                  background: "rgba(108,99,255,0.2)",
+                  color: "#f0f0ff",
                   fontFamily: "var(--font-body)",
-                  fontSize: 16,
-                  color: "#8888aa",
+                  cursor: "pointer",
                 }}
               >
-                Preparing your debrief{" "}
-                <span style={{ fontFamily: "var(--font-japanese)" }}>
-                  ミルの分析
-                </span>
-                …
-              </p>
+                View Debrief
+              </button>
             </motion.div>
           </motion.div>
         )}
