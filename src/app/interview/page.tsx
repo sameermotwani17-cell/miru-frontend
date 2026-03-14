@@ -171,6 +171,7 @@ export default function InterviewPage() {
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const submitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const transcriptPreviewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const chatBottomRef = useRef<HTMLDivElement | null>(null);
 
   const startedRef = useRef(false);
   const completingRef = useRef(false);
@@ -433,6 +434,10 @@ export default function InterviewPage() {
       finalizeInterview();
     }
   }, [timerSeconds, timerMaxSecs, machine.status, finalizeInterview]);
+
+  useEffect(() => {
+    chatBottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [machine.messages, machine.status]);
 
   const startRecording = useCallback(() => {
     if (machine.status !== "QUESTION") {
@@ -723,6 +728,8 @@ export default function InterviewPage() {
               MIRU is thinking...
             </div>
           )}
+
+          <div ref={chatBottomRef} />
         </div>
 
         {lastTranscript && (
