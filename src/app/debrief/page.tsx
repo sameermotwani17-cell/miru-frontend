@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import MiruLogo from "@/components/MiruLogo";
 import MiruRadarChart from "@/components/MiruRadarChart";
 import ScoreBar from "@/components/ScoreBar";
@@ -67,25 +67,43 @@ function getScoreColor(score: number): string {
 
 export default function DebriefPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [results, setResults] = useState<FullResults | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const id = session.getSessionId();
+    const id = searchParams.get("session_id") ?? session.getSessionId();
     if (!id) {
       router.push("/");
       return;
     }
 
-    const stored = session.getResults();
-    if (stored) {
-      setResults(stored);
-    } else {
-      setError("No results found. Please complete an interview first.");
-    }
-    setLoading(false);
-  }, [router]);
+    session.setSessionId(id);
+
+    const loadResults = async () => {
+      try {
+        const response = await fetch(`/api/interview/results?session_id=${encodeURIComponent(id)}`);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const data = (await response.json()) as FullResults;
+        setResults(data);
+        session.setResults(data);
+      } catch {
+        const stored = session.getResults();
+        if (stored) {
+          setResults(stored);
+        } else {
+          setError("No results found. Please complete an interview first.");
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void loadResults();
+  }, [router, searchParams]);
 
   const handlePracticeAgain = () => {
     session.clearForNewSession();

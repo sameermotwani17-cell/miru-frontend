@@ -273,6 +273,11 @@ export default function InterviewPage() {
 
     try {
       const res = await sendTurnWithRetry("start");
+      const sid = machine.sessionId ?? crypto.randomUUID();
+      if (res.interview_complete || res.is_wrapping_up) {
+        router.push(`/debrief?session_id=${sid}`);
+        return;
+      }
       const firstPrompt = res.agent_text?.trim() || "Please introduce yourself.";
       askedQuestionsRef.current = [firstPrompt];
 
@@ -331,7 +336,13 @@ export default function InterviewPage() {
 
       try {
         const res = await sendTurnWithRetry(safeAnswer);
-        const nextPrompt = res.agent_text?.trim() || "Thank you.";
+        const sid = machine.sessionId ?? crypto.randomUUID();
+        if (res.interview_complete || res.is_wrapping_up) {
+          router.push(`/debrief?session_id=${sid}`);
+          return;
+        }
+
+        const nextPrompt = res.agent_text?.trim() || "Please continue.";
 
         askedQuestionsRef.current.push(nextPrompt);
 
@@ -375,7 +386,7 @@ export default function InterviewPage() {
     const durId = session.getDurationMode() ?? "demo";
 
     if (!id) {
-      id = `miru-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+      id = crypto.randomUUID();
       session.setSessionId(id);
     }
 
@@ -510,10 +521,6 @@ export default function InterviewPage() {
 
     void executeAnswerTurn(pending.answer, false);
   }, [executeStartTurn, executeAnswerTurn]);
-
-  const openDebrief = useCallback(() => {
-    router.push("/debrief");
-  }, [router]);
 
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60);
@@ -828,82 +835,6 @@ export default function InterviewPage() {
         />
       </div>
 
-      <AnimatePresence>
-        {machine.status === "COMPLETED" && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            style={{
-              position: "fixed",
-              inset: 0,
-              background: "rgba(5,5,8,0.92)",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              zIndex: 100,
-              backdropFilter: "blur(12px)",
-            }}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.2, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-              style={{ textAlign: "center" }}
-            >
-              <div style={{ fontSize: 48, marginBottom: 20 }}>✓</div>
-              <h2
-                style={{
-                  fontFamily: "var(--font-display)",
-                  fontSize: 32,
-                  fontWeight: 700,
-                  color: "#f0f0ff",
-                  marginBottom: 12,
-                }}
-              >
-                Interview finished
-              </h2>
-
-              {machine.latestScores && (
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(2, minmax(150px, 1fr))",
-                    gap: 8,
-                    color: "#c8c9e6",
-                    fontFamily: "var(--font-body)",
-                    fontSize: 13,
-                    textAlign: "left",
-                    marginBottom: 16,
-                  }}
-                >
-                  <div>Self PR: {machine.latestScores.jiko_pr}</div>
-                  <div>Motivation: {machine.latestScores.shibou_douki}</div>
-                  <div>Teamwork: {machine.latestScores.kyouchousei}</div>
-                  <div>Growth: {machine.latestScores.seichou_iyoku}</div>
-                  <div>Culture fit: {machine.latestScores.bunka_tekigou}</div>
-                </div>
-              )}
-
-              <button
-                onClick={openDebrief}
-                style={{
-                  padding: "10px 16px",
-                  borderRadius: 10,
-                  border: "1px solid rgba(108,99,255,0.55)",
-                  background: "rgba(108,99,255,0.2)",
-                  color: "#f0f0ff",
-                  fontFamily: "var(--font-body)",
-                  cursor: "pointer",
-                }}
-              >
-                View Debrief
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

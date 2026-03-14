@@ -68,6 +68,7 @@ export interface InterviewScores {
 export interface InterviewTurnResponse {
   agent_text: string;
   is_wrapping_up: boolean;
+  interview_complete?: boolean;
   scores?: InterviewScores;
 }
 
