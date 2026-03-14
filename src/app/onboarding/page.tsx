@@ -16,7 +16,89 @@ const slideVariants = {
 };
 
 type LanguageMode = "japanese" | "english";
-type DurationMode = "demo" | "full";
+type DurationMode = "demo" | "15min" | "30min" | "45min" | "full";
+
+interface DurationOption {
+  id: DurationMode;
+  label: string;
+  sublabel: string;
+  description: string;
+  badge: string | null;
+  badgeColor: "amber" | "indigo" | "red" | null;
+  questions: number | null; // null = unlimited
+  durationMins: number;
+}
+
+const DURATION_OPTIONS: DurationOption[] = [
+  {
+    id: "demo",
+    label: "Demo",
+    sublabel: "3 questions · ~3 min",
+    description: "Quick taste of the experience. No pressure.",
+    badge: "DEMO",
+    badgeColor: "amber",
+    questions: 3,
+    durationMins: 3,
+  },
+  {
+    id: "15min",
+    label: "15 min",
+    sublabel: "~6 questions",
+    description: "Light warm-up session for busy days.",
+    badge: null,
+    badgeColor: null,
+    questions: 6,
+    durationMins: 15,
+  },
+  {
+    id: "30min",
+    label: "30 min",
+    sublabel: "~12 questions",
+    description: "The recommended depth for real practice.",
+    badge: "POPULAR",
+    badgeColor: "indigo",
+    questions: 12,
+    durationMins: 30,
+  },
+  {
+    id: "45min",
+    label: "45 min",
+    sublabel: "~18 questions",
+    description: "Extended session for serious preparation.",
+    badge: null,
+    badgeColor: null,
+    questions: 18,
+    durationMins: 45,
+  },
+  {
+    id: "full",
+    label: "Full Throttle",
+    sublabel: "All questions · no limit",
+    description: "Every question. No clock. Maximum exposure.",
+    badge: "INTENSE",
+    badgeColor: "red",
+    questions: null,
+    durationMins: 60,
+  },
+];
+
+const BADGE_STYLES: Record<"amber" | "indigo" | "red", React.CSSProperties> = {
+  amber: {
+    background: "rgba(255,179,71,0.15)",
+    border: "1px solid rgba(255,179,71,0.35)",
+    color: "#ffb347",
+  },
+  indigo: {
+    background: "rgba(108,99,255,0.15)",
+    border: "1px solid rgba(108,99,255,0.35)",
+    color: "#6c63ff",
+  },
+  red: {
+    background: "rgba(239,68,68,0.15)",
+    border: "1px solid rgba(239,68,68,0.35)",
+    color: "#ef4444",
+  },
+};
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -53,13 +135,18 @@ export default function OnboardingPage() {
   const handleBegin = async () => {
     setError("");
     setLoading(true);
+
+    const selectedDuration = DURATION_OPTIONS.find((o) => o.id === durationMode)!;
+    // Send 0 for "unlimited" so backend doesn't fail on null
+    const targetQuestions = selectedDuration.questions ?? 0;
+
     try {
       const res = await startInterview({
         user_name: name,
         target_role: role,
         company: selectedCompany,
         language_mode: languageMode,
-        duration_mins: durationMode === "demo" ? 3 : 15,
+        duration_mins: selectedDuration.durationMins,
       });
 
       session.setSessionId(res.session_id);
@@ -67,6 +154,7 @@ export default function OnboardingPage() {
       session.setLanguageMode(languageMode);
       session.setCvText(cvText);
       session.setDurationMode(durationMode);
+      session.setQuestionCountTarget(targetQuestions === 0 ? null : targetQuestions);
       session.setCandidateName(name);
       session.setTargetRole(role);
       session.setInterviewStarted(true);
@@ -423,26 +511,113 @@ export default function OnboardingPage() {
                     </div>
                   </div>
 
-                  {/* Duration */}
+                  {/* Duration — 5 cards */}
                   <div>
                     <SectionLabel>Session Duration</SectionLabel>
-                    <div style={{ display: "flex", gap: 10 }}>
-                      {(
-                        [
-                          { value: "demo", label: "Demo", sub: "3 questions" },
-                          { value: "full", label: "Full", sub: "5 questions" },
-                        ] as const
-                      ).map((opt) => (
-                        <ToggleButton
-                          key={opt.value}
-                          selected={durationMode === opt.value}
-                          onClick={() => setDurationMode(opt.value)}
-                          accent={selectedCompanyData?.accent}
-                        >
-                          <span style={{ display: "block", fontWeight: 600, fontSize: 13 }}>{opt.label}</span>
-                          <span style={{ display: "block", fontSize: 11, opacity: 0.7, marginTop: 2 }}>{opt.sub}</span>
-                        </ToggleButton>
-                      ))}
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(5, 1fr)",
+                        gap: 8,
+                      }}
+                    >
+                      {DURATION_OPTIONS.map((opt) => {
+                        const isSelected = durationMode === opt.id;
+                        const isFull = opt.id === "full";
+
+                        const borderColor = isSelected
+                          ? isFull
+                            ? "rgba(239,68,68,0.6)"
+                            : "var(--accent-primary)"
+                          : "var(--border-subtle)";
+
+                        const bgColor = isSelected
+                          ? isFull
+                            ? "rgba(239,68,68,0.08)"
+                            : "rgba(108,99,255,0.10)"
+                          : "rgba(13,13,20,0.5)";
+
+                        const boxShadow = isSelected && isFull
+                          ? "0 0 16px rgba(239,68,68,0.2)"
+                          : "none";
+
+                        return (
+                          <motion.button
+                            key={opt.id}
+                            onClick={() => setDurationMode(opt.id)}
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.97 }}
+                            style={{
+                              position: "relative",
+                              padding: "12px 10px 10px",
+                              borderRadius: 10,
+                              border: `1px solid ${borderColor}`,
+                              background: bgColor,
+                              boxShadow,
+                              cursor: "pointer",
+                              textAlign: "left" as const,
+                              transition: "border-color 0.2s, background 0.2s, box-shadow 0.2s",
+                            }}
+                          >
+                            {/* Badge */}
+                            {opt.badge && opt.badgeColor && (
+                              <span
+                                style={{
+                                  position: "absolute",
+                                  top: 6,
+                                  right: 6,
+                                  padding: "2px 5px",
+                                  borderRadius: 4,
+                                  fontSize: 8,
+                                  fontFamily: "var(--font-body)",
+                                  fontWeight: 700,
+                                  letterSpacing: "0.06em",
+                                  ...BADGE_STYLES[opt.badgeColor],
+                                }}
+                              >
+                                {opt.badge}
+                              </span>
+                            )}
+
+                            <p
+                              style={{
+                                fontFamily: "var(--font-display)",
+                                fontSize: 13,
+                                fontWeight: 700,
+                                color: isSelected
+                                  ? isFull ? "#ef4444" : "var(--accent-primary)"
+                                  : "var(--text-primary)",
+                                marginBottom: 3,
+                                paddingRight: opt.badge ? 32 : 0,
+                                lineHeight: 1.2,
+                              }}
+                            >
+                              {opt.label}
+                            </p>
+                            <p
+                              style={{
+                                fontFamily: "var(--font-body)",
+                                fontSize: 10,
+                                color: "var(--text-secondary)",
+                                lineHeight: 1.3,
+                              }}
+                            >
+                              {opt.sublabel}
+                            </p>
+                            <p
+                              style={{
+                                fontFamily: "var(--font-body)",
+                                fontSize: 9,
+                                color: "var(--text-dim)",
+                                lineHeight: 1.3,
+                                marginTop: 4,
+                              }}
+                            >
+                              {opt.description}
+                            </p>
+                          </motion.button>
+                        );
+                      })}
                     </div>
                   </div>
 

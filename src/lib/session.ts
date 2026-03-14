@@ -8,6 +8,7 @@ const KEYS = {
   INTERVIEW_STARTED: "saiko_interview_started",
   INTERVIEW_COMPLETE: "saiko_interview_complete",
   QUESTION_COUNT: "saiko_question_count",
+  QUESTION_COUNT_TARGET: "saiko_question_count_target",
   DURATION_MODE: "saiko_duration_mode",
   CANDIDATE_NAME: "saiko_candidate_name",
   TARGET_ROLE: "saiko_target_role",
@@ -62,6 +63,17 @@ export const session = {
     }),
   setQuestionCount: (v: number) =>
     safe(() => sessionStorage.setItem(KEYS.QUESTION_COUNT, String(v))),
+
+  getQuestionCountTarget: (): number | null =>
+    safe(() => {
+      const v = sessionStorage.getItem(KEYS.QUESTION_COUNT_TARGET);
+      return v ? parseInt(v, 10) : null;
+    }),
+  setQuestionCountTarget: (v: number | null) =>
+    safe(() => {
+      if (v === null) sessionStorage.removeItem(KEYS.QUESTION_COUNT_TARGET);
+      else sessionStorage.setItem(KEYS.QUESTION_COUNT_TARGET, String(v));
+    }),
 
   getCandidateName: () =>
     safe(() => sessionStorage.getItem(KEYS.CANDIDATE_NAME)),

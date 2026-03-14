@@ -24,10 +24,11 @@ function SectionHeader({ label, title }: { label: string; title: string }) {
       <p
         style={{
           fontSize: 11,
-          color: "var(--accent-secondary)",
+          color: "var(--text-page-accent)",
           letterSpacing: "0.14em",
           fontFamily: "var(--font-body)",
           marginBottom: 6,
+          fontWeight: 600,
         }}
       >
         {label}
@@ -37,7 +38,7 @@ function SectionHeader({ label, title }: { label: string; title: string }) {
           fontFamily: "var(--font-display)",
           fontSize: "clamp(22px, 4vw, 32px)",
           fontWeight: 700,
-          color: "var(--text-primary)",
+          color: "var(--text-page-heading)",
           lineHeight: 1.2,
         }}
       >
@@ -122,7 +123,7 @@ export default function DebriefPage() {
         <p
           style={{
             fontFamily: "var(--font-body)",
-            color: "var(--text-secondary)",
+            color: "var(--text-page-body)",
             fontSize: 14,
           }}
         >
@@ -186,11 +187,23 @@ export default function DebriefPage() {
     const avg = Object.values(t.scores).reduce((a, b) => a + b, 0) / Object.values(t.scores).length;
     return avg < 7;
   });
+  const company = session.getCompany() ?? "";
+  const sessionId = session.getSessionId() ?? "";
 
   return (
-    <div style={{ minHeight: "100vh" }}>
+    <div style={{ minHeight: "100vh", paddingBottom: 120 }}>
+
+      {/* Print-only header (hidden on screen) */}
+      <div className="print-header">
+        <h1>MIRU — Interview Report</h1>
+        <p>
+          Company: {company || "—"} · Date: {new Date().toLocaleDateString()} · Session: {sessionId.slice(0, 8)}
+        </p>
+      </div>
+
       {/* Nav */}
       <nav
+        className="no-print"
         style={{
           position: "sticky",
           top: 0,
@@ -207,8 +220,7 @@ export default function DebriefPage() {
         <MiruLogo size="sm" />
         <div style={{ display: "flex", gap: 12 }}>
           <button
-            onClick={() => window.print()}
-            className="no-print"
+            onClick={handleDifferentCompany}
             style={{
               padding: "8px 18px",
               borderRadius: 8,
@@ -220,7 +232,7 @@ export default function DebriefPage() {
               cursor: "pointer",
             }}
           >
-            Download Report
+            Try Different Company
           </button>
           <button
             onClick={handlePracticeAgain}
@@ -243,9 +255,9 @@ export default function DebriefPage() {
 
       <div
         style={{
-          maxWidth: 860,
+          maxWidth: 900,
           margin: "0 auto",
-          padding: "60px 24px 100px",
+          padding: "60px 24px 40px",
         }}
       >
         {/* Hero score */}
@@ -259,7 +271,7 @@ export default function DebriefPage() {
             style={{
               fontFamily: "var(--font-japanese)",
               fontSize: 14,
-              color: "var(--accent-secondary)",
+              color: "var(--text-page-accent)",
               marginBottom: 16,
             }}
           >
@@ -270,7 +282,7 @@ export default function DebriefPage() {
               fontFamily: "var(--font-display)",
               fontSize: "clamp(32px, 6vw, 56px)",
               fontWeight: 700,
-              color: "var(--text-primary)",
+              color: "var(--text-page-heading)",
               marginBottom: 12,
             }}
           >
@@ -301,7 +313,7 @@ export default function DebriefPage() {
               style={{
                 fontFamily: "var(--font-body)",
                 fontSize: 13,
-                color: "var(--text-secondary)",
+                color: "var(--text-page-body)",
               }}
             >
               / 10 overall
@@ -313,7 +325,7 @@ export default function DebriefPage() {
         <section style={{ marginBottom: 80 }}>
           <SectionHeader label="SECTION 01" title="Score Overview" />
 
-          <div className="glass-card" style={{ padding: 32, marginBottom: 28 }}>
+          <div className="glass-card radar-chart-wrapper" style={{ padding: 32, marginBottom: 28 }}>
             <MiruRadarChart scores={radar} />
           </div>
 
@@ -337,7 +349,7 @@ export default function DebriefPage() {
             style={{
               fontFamily: "var(--font-body)",
               fontSize: 14,
-              color: "var(--text-secondary)",
+              color: "var(--text-page-body)",
               marginBottom: 28,
               lineHeight: 1.6,
             }}
@@ -360,7 +372,7 @@ export default function DebriefPage() {
               style={{
                 fontFamily: "var(--font-body)",
                 fontSize: 14,
-                color: "var(--text-secondary)",
+                color: "var(--text-page-body)",
                 marginBottom: 28,
                 lineHeight: 1.6,
               }}
@@ -376,249 +388,331 @@ export default function DebriefPage() {
           </section>
         )}
 
-        {/* Section 4 — Company Flag */}
+        {/* Section 5 — Summary (2-column: left=radar+summary, right=insights) */}
         <section style={{ marginBottom: 80 }}>
-          <SectionHeader label="SECTION 04" title="Company Flag" />
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-            style={{
-              padding: "28px 32px",
-              borderRadius: 16,
-              border: "1px solid rgba(59,130,246,0.3)",
-              background: "rgba(59,130,246,0.05)",
-              position: "relative",
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                height: 2,
-                background: "linear-gradient(90deg, var(--accent-primary), var(--accent-secondary))",
-              }}
-            />
-            <p
-              style={{
-                fontSize: 11,
-                color: "var(--accent-secondary)",
-                letterSpacing: "0.1em",
-                fontFamily: "var(--font-body)",
-                fontWeight: 600,
-                marginBottom: 12,
-              }}
-            >
-              {session.getCompany()?.toUpperCase()} SPECIFIC INSIGHT
-            </p>
-            <p
-              style={{
-                fontFamily: "var(--font-body)",
-                fontSize: 16,
-                color: "var(--text-primary)",
-                lineHeight: 1.7,
-              }}
-            >
-              {report.company_flag}
-            </p>
-          </motion.div>
-        </section>
+          <SectionHeader label="SECTION 05" title="Full Assessment" />
 
-        {/* Section 5 — Summary + CTA */}
-        <section style={{ marginBottom: 80 }}>
-          <SectionHeader label="SECTION 05" title="Summary & Next Steps" />
-
-          {/* Strengths + improvements */}
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 20,
-              marginBottom: 28,
+              gridTemplateColumns: "1fr 1.1fr",
+              gap: 28,
+              alignItems: "start",
             }}
           >
-            <div className="glass-card" style={{ padding: 24 }}>
-              <p
+            {/* LEFT — compact radar + overall summary */}
+            <div>
+              {/* Overall score pill */}
+              <div
                 style={{
-                  fontSize: 11,
-                  color: "var(--accent-green)",
-                  letterSpacing: "0.1em",
-                  fontFamily: "var(--font-body)",
-                  fontWeight: 600,
-                  marginBottom: 12,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  marginBottom: 20,
                 }}
               >
-                STRENGTHS
-              </p>
-              <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-                {report.strengths.map((s, i) => (
-                  <li
-                    key={i}
+                <div
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "8px 18px",
+                    borderRadius: 999,
+                    border: `1px solid ${getScoreColor(avgScore)}50`,
+                    background: `${getScoreColor(avgScore)}12`,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontFamily: "var(--font-display)",
+                      fontSize: 22,
+                      fontWeight: 800,
+                      color: getScoreColor(avgScore),
+                    }}
+                  >
+                    {avgScore.toFixed(1)}
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: "var(--font-body)",
+                      fontSize: 12,
+                      color: "var(--text-page-muted)",
+                    }}
+                  >
+                    / 10
+                  </span>
+                </div>
+                <span
+                  style={{
+                    fontFamily: "var(--font-body)",
+                    fontSize: 12,
+                    color: "var(--text-page-muted)",
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase" as const,
+                  }}
+                >
+                  Overall Score
+                </span>
+              </div>
+
+              {/* Compact radar */}
+              <div
+                className="glass-card radar-chart-wrapper"
+                style={{ padding: "16px 16px 8px", marginBottom: 20, height: 280, overflow: "hidden" }}
+              >
+                <MiruRadarChart scores={radar} />
+              </div>
+
+              {/* Overall summary */}
+              <div
+                className="glass-card"
+                style={{
+                  padding: "20px 22px",
+                  borderColor: "rgba(108,99,255,0.2)",
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: 10,
+                    color: "var(--accent-primary)",
+                    letterSpacing: "0.1em",
+                    fontFamily: "var(--font-body)",
+                    fontWeight: 700,
+                    marginBottom: 10,
+                  }}
+                >
+                  OVERALL ASSESSMENT
+                </p>
+                <p
+                  style={{
+                    fontFamily: "var(--font-body)",
+                    fontSize: 13,
+                    color: "var(--text-secondary)",
+                    lineHeight: 1.7,
+                  }}
+                >
+                  {report.overall_summary}
+                </p>
+              </div>
+            </div>
+
+            {/* RIGHT — strengths, improvements, focus, company flag */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {/* Strengths */}
+              <div className="glass-card" style={{ padding: 22 }}>
+                <p
+                  style={{
+                    fontSize: 11,
+                    color: "var(--accent-green)",
+                    letterSpacing: "0.1em",
+                    fontFamily: "var(--font-body)",
+                    fontWeight: 600,
+                    marginBottom: 12,
+                  }}
+                >
+                  STRENGTHS
+                </p>
+                <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                  {report.strengths.map((s, i) => (
+                    <li
+                      key={i}
+                      style={{
+                        fontFamily: "var(--font-body)",
+                        fontSize: 13,
+                        color: "var(--text-secondary)",
+                        lineHeight: 1.6,
+                        paddingBottom: 8,
+                        borderBottom:
+                          i < report.strengths.length - 1
+                            ? "1px solid var(--border-subtle)"
+                            : "none",
+                        marginBottom: 8,
+                        paddingLeft: 12,
+                        position: "relative",
+                      }}
+                    >
+                      <span style={{ position: "absolute", left: 0, color: "var(--accent-green)" }}>·</span>
+                      {s}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Areas to Improve */}
+              <div className="glass-card" style={{ padding: 22 }}>
+                <p
+                  style={{
+                    fontSize: 11,
+                    color: "var(--accent-warm)",
+                    letterSpacing: "0.1em",
+                    fontFamily: "var(--font-body)",
+                    fontWeight: 600,
+                    marginBottom: 12,
+                  }}
+                >
+                  AREAS TO IMPROVE
+                </p>
+                <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                  {report.improvement_areas.map((s, i) => (
+                    <li
+                      key={i}
+                      style={{
+                        fontFamily: "var(--font-body)",
+                        fontSize: 13,
+                        color: "var(--text-secondary)",
+                        lineHeight: 1.6,
+                        paddingBottom: 8,
+                        borderBottom:
+                          i < report.improvement_areas.length - 1
+                            ? "1px solid var(--border-subtle)"
+                            : "none",
+                        marginBottom: 8,
+                        paddingLeft: 12,
+                        position: "relative",
+                      }}
+                    >
+                      <span style={{ position: "absolute", left: 0, color: "var(--accent-warm)" }}>·</span>
+                      {s}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Recommended Focus */}
+              {report.recommended_focus && (
+                <div
+                  className="glass-card"
+                  style={{
+                    padding: "18px 22px",
+                    borderColor: "rgba(108,99,255,0.25)",
+                  }}
+                >
+                  <p
+                    style={{
+                      fontSize: 11,
+                      color: "var(--accent-primary)",
+                      letterSpacing: "0.1em",
+                      fontFamily: "var(--font-body)",
+                      fontWeight: 600,
+                      marginBottom: 8,
+                    }}
+                  >
+                    RECOMMENDED FOCUS
+                  </p>
+                  <p
                     style={{
                       fontFamily: "var(--font-body)",
                       fontSize: 13,
                       color: "var(--text-secondary)",
                       lineHeight: 1.6,
-                      paddingBottom: 8,
-                      borderBottom:
-                        i < report.strengths.length - 1
-                          ? "1px solid var(--border-subtle)"
-                          : "none",
-                      marginBottom: 8,
-                      paddingLeft: 12,
-                      position: "relative",
                     }}
                   >
-                    <span
-                      style={{
-                        position: "absolute",
-                        left: 0,
-                        color: "var(--accent-green)",
-                      }}
-                    >
-                      ·
-                    </span>
-                    {s}
-                  </li>
-                ))}
-              </ul>
+                    {report.recommended_focus}
+                  </p>
+                </div>
+              )}
+
+              {/* Company Flag (moved from Section 04) */}
+              <div
+                style={{
+                  padding: "18px 22px",
+                  borderRadius: 14,
+                  border: "1px solid rgba(59,130,246,0.3)",
+                  background: "rgba(59,130,246,0.05)",
+                  position: "relative",
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: 2,
+                    background: "linear-gradient(90deg, var(--accent-primary), var(--accent-secondary))",
+                  }}
+                />
+                <p
+                  style={{
+                    fontSize: 11,
+                    color: "var(--accent-secondary)",
+                    letterSpacing: "0.1em",
+                    fontFamily: "var(--font-body)",
+                    fontWeight: 600,
+                    marginBottom: 10,
+                  }}
+                >
+                  {company.toUpperCase()} INSIGHT
+                </p>
+                <p
+                  style={{
+                    fontFamily: "var(--font-body)",
+                    fontSize: 13,
+                    color: "var(--text-primary)",
+                    lineHeight: 1.7,
+                  }}
+                >
+                  {report.company_flag}
+                </p>
+              </div>
             </div>
-
-            <div className="glass-card" style={{ padding: 24 }}>
-              <p
-                style={{
-                  fontSize: 11,
-                  color: "var(--accent-warm)",
-                  letterSpacing: "0.1em",
-                  fontFamily: "var(--font-body)",
-                  fontWeight: 600,
-                  marginBottom: 12,
-                }}
-              >
-                AREAS TO IMPROVE
-              </p>
-              <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-                {report.improvement_areas.map((s, i) => (
-                  <li
-                    key={i}
-                    style={{
-                      fontFamily: "var(--font-body)",
-                      fontSize: 13,
-                      color: "var(--text-secondary)",
-                      lineHeight: 1.6,
-                      paddingBottom: 8,
-                      borderBottom:
-                        i < report.improvement_areas.length - 1
-                          ? "1px solid var(--border-subtle)"
-                          : "none",
-                      marginBottom: 8,
-                      paddingLeft: 12,
-                      position: "relative",
-                    }}
-                  >
-                    <span
-                      style={{
-                        position: "absolute",
-                        left: 0,
-                        color: "var(--accent-warm)",
-                      }}
-                    >
-                      ·
-                    </span>
-                    {s}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-
-          {/* Recommended focus */}
-          {report.recommended_focus && (
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              className="glass-card"
-              style={{
-                padding: "20px 24px",
-                marginBottom: 36,
-                borderColor: "rgba(108,99,255,0.25)",
-              }}
-            >
-              <p
-                style={{
-                  fontSize: 11,
-                  color: "var(--accent-primary)",
-                  letterSpacing: "0.1em",
-                  fontFamily: "var(--font-body)",
-                  fontWeight: 600,
-                  marginBottom: 8,
-                }}
-              >
-                RECOMMENDED FOCUS
-              </p>
-              <p
-                style={{
-                  fontFamily: "var(--font-body)",
-                  fontSize: 14,
-                  color: "var(--text-primary)",
-                  lineHeight: 1.6,
-                }}
-              >
-                {report.recommended_focus}
-              </p>
-            </motion.div>
-          )}
-
-          {/* CTA buttons */}
-          <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-            <motion.button
-              onClick={handlePracticeAgain}
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
-              style={{
-                flex: 1,
-                padding: "15px 24px",
-                borderRadius: 12,
-                background:
-                  "linear-gradient(135deg, var(--accent-primary), #8B5CF6)",
-                border: "none",
-                color: "#fff",
-                fontFamily: "var(--font-body)",
-                fontSize: 15,
-                fontWeight: 600,
-                cursor: "pointer",
-                minWidth: 180,
-              }}
-            >
-              Practice Again
-            </motion.button>
-            <motion.button
-              onClick={handleDifferentCompany}
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
-              style={{
-                flex: 1,
-                padding: "15px 24px",
-                borderRadius: 12,
-                border: "1px solid var(--border-active)",
-                background: "rgba(108,99,255,0.08)",
-                color: "var(--text-primary)",
-                fontFamily: "var(--font-body)",
-                fontSize: 15,
-                fontWeight: 600,
-                cursor: "pointer",
-                minWidth: 180,
-              }}
-            >
-              Try a Different Company
-            </motion.button>
           </div>
         </section>
+      </div>
+
+      {/* Fixed bottom-right PDF download FAB */}
+      <div
+        className="no-print"
+        style={{
+          position: "fixed",
+          bottom: 32,
+          right: 32,
+          zIndex: 100,
+          display: "flex",
+          flexDirection: "column",
+          gap: 10,
+        }}
+      >
+        <motion.button
+          onClick={() => window.print()}
+          whileHover={{ scale: 1.04, boxShadow: "0 0 28px rgba(108,99,255,0.45)" }}
+          whileTap={{ scale: 0.97 }}
+          style={{
+            padding: "13px 22px",
+            borderRadius: 12,
+            background: "linear-gradient(135deg, var(--accent-primary), #8B5CF6)",
+            border: "none",
+            color: "#fff",
+            fontFamily: "var(--font-body)",
+            fontSize: 14,
+            fontWeight: 700,
+            cursor: "pointer",
+            boxShadow: "0 4px 24px rgba(108,99,255,0.3)",
+            letterSpacing: "0.02em",
+          }}
+        >
+          ↓ Download Report
+        </motion.button>
+        <motion.button
+          onClick={handlePracticeAgain}
+          whileHover={{ scale: 1.03 }}
+          whileTap={{ scale: 0.97 }}
+          style={{
+            padding: "11px 22px",
+            borderRadius: 12,
+            border: "1px solid var(--border-active)",
+            background: "rgba(13,13,20,0.85)",
+            backdropFilter: "blur(12px)",
+            color: "var(--text-secondary)",
+            fontFamily: "var(--font-body)",
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
+        >
+          Start Again
+        </motion.button>
       </div>
     </div>
   );

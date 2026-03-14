@@ -116,13 +116,13 @@ export default function LandingPage() {
                 display: "inline-block",
                 padding: "6px 16px",
                 borderRadius: 999,
-                border: "1px solid var(--border-subtle)",
-                color: "var(--accent-secondary)",
+                border: "1px solid rgba(108,99,255,0.25)",
+                color: "var(--text-page-accent)",
                 fontSize: 12,
                 letterSpacing: "0.12em",
                 fontFamily: "var(--font-body)",
                 marginBottom: 32,
-                background: "rgba(0,212,255,0.05)",
+                background: "rgba(108,99,255,0.07)",
               }}
             >
               <span style={{ fontFamily: "var(--font-japanese)" }}>
@@ -141,7 +141,7 @@ export default function LandingPage() {
               fontWeight: 700,
               lineHeight: 1.1,
               letterSpacing: "-0.02em",
-              color: "var(--text-primary)",
+              color: "var(--text-page-heading)",
               maxWidth: 800,
               margin: "0 auto 20px",
             }}
@@ -166,7 +166,7 @@ export default function LandingPage() {
             style={{
               fontFamily: "var(--font-body)",
               fontSize: "clamp(16px, 2.5vw, 20px)",
-              color: "var(--text-secondary)",
+              color: "var(--text-page-body)",
               maxWidth: 600,
               margin: "0 auto 48px",
               lineHeight: 1.6,
@@ -174,7 +174,7 @@ export default function LandingPage() {
           >
             Foreigners don&apos;t fail Japanese interviews because of language.
             They fail because of invisible cultural signals.{" "}
-            <span style={{ color: "var(--text-primary)" }}>
+            <span style={{ color: "var(--text-page-heading)", fontWeight: 600 }}>
               MIRU makes them visible.
             </span>
           </motion.p>
@@ -224,7 +224,7 @@ export default function LandingPage() {
             fontFamily: "var(--font-display)",
             fontSize: "clamp(24px, 4vw, 40px)",
             fontWeight: 700,
-            color: "var(--text-primary)",
+            color: "var(--text-page-heading)",
             marginBottom: 60,
           }}
         >
@@ -290,7 +290,7 @@ export default function LandingPage() {
           style={{
             fontFamily: "var(--font-body)",
             fontSize: 13,
-            color: "var(--text-dim)",
+            color: "var(--text-page-muted)",
             letterSpacing: "0.12em",
             textTransform: "uppercase",
             marginBottom: 32,
@@ -367,7 +367,7 @@ export default function LandingPage() {
             style={{
               fontFamily: "var(--font-japanese)",
               fontSize: 14,
-              color: "var(--accent-secondary)",
+              color: "var(--text-page-accent)",
               marginBottom: 16,
             }}
           >
@@ -377,7 +377,7 @@ export default function LandingPage() {
             style={{
               fontFamily: "var(--font-body)",
               fontSize: 16,
-              color: "var(--text-secondary)",
+              color: "var(--text-page-body)",
               marginBottom: 32,
             }}
           >
@@ -391,11 +391,11 @@ export default function LandingPage() {
                 padding: "14px 36px",
                 borderRadius: 10,
                 border: "1px solid var(--border-active)",
-                background: "rgba(108,99,255,0.1)",
-                color: "var(--text-primary)",
+                background: "rgba(108,99,255,0.12)",
+                color: "var(--text-page-heading)",
                 fontFamily: "var(--font-body)",
                 fontSize: 15,
-                fontWeight: 600,
+                fontWeight: 700,
                 cursor: "pointer",
               }}
             >

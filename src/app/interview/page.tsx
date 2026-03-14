@@ -59,7 +59,8 @@ export default function InterviewPage() {
   const [reaction, setReaction] = useState("");
   const [error, setError] = useState("");
   const [timerSeconds, setTimerSeconds] = useState(0);
-  const [isDemo, setIsDemo] = useState(false);
+  const [timerMaxSecs, setTimerMaxSecs] = useState(0); // 0 = count up (unlimited)
+  const [durationId, setDurationId] = useState("");
   const [company, setCompany] = useState("");
   const [isComplete, setIsComplete] = useState(false);
 
@@ -71,13 +72,15 @@ export default function InterviewPage() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const stateRef = useRef<InterviewState>("idle");
+  const autoCompleteRef = useRef(false); // guard against double-completion
   stateRef.current = interviewState;
 
   useEffect(() => {
     const id = session.getSessionId();
     const comp = session.getCompany() ?? "";
     const name = session.getCandidateName() ?? "";
-    const duration = session.getDurationMode();
+    const durId = session.getDurationMode() ?? "demo";
+    const targetCount = session.getQuestionCountTarget();
 
     if (!id) {
       router.push("/onboarding");
@@ -85,26 +88,95 @@ export default function InterviewPage() {
     }
 
     setCompany(comp);
-    const demo = duration === "demo";
-    setIsDemo(demo);
+    setDurationId(durId);
 
     const allQuestions = COMPANY_QUESTIONS[comp] ?? DEFAULT_QUESTIONS;
-    const qs = demo ? allQuestions.slice(0, 3) : allQuestions;
+
+    // Cap question count at available questions
+    let qs: string[];
+    if (targetCount === null || targetCount === 0) {
+      qs = allQuestions; // full / unlimited
+    } else {
+      qs = allQuestions.slice(0, Math.min(targetCount, allQuestions.length));
+    }
     setQuestions(qs);
     questionsRef.current = qs;
 
     // Store name for result building (referenced via session)
     void name;
 
-    timerRef.current = setInterval(() => {
-      setTimerSeconds((s) => s + 1);
-    }, 1000);
+    // Set up timer
+    const maxSecs =
+      durId === "demo"   ? 180  :
+      durId === "15min"  ? 900  :
+      durId === "30min"  ? 1800 :
+      durId === "45min"  ? 2700 : 0; // "full" = 0 = count up
+
+    setTimerMaxSecs(maxSecs);
+
+    if (maxSecs > 0) {
+      // countdown
+      setTimerSeconds(maxSecs);
+      timerRef.current = setInterval(() => {
+        setTimerSeconds((s) => Math.max(0, s - 1));
+      }, 1000);
+    } else {
+      // count up
+      setTimerSeconds(0);
+      timerRef.current = setInterval(() => {
+        setTimerSeconds((s) => s + 1);
+      }, 1000);
+    }
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       if (recognitionRef.current) recognitionRef.current.stop();
     };
   }, [router]);
+
+  // Auto-complete when countdown hits zero
+  useEffect(() => {
+    if (
+      timerMaxSecs > 0 &&
+      timerSeconds === 0 &&
+      !isComplete &&
+      !autoCompleteRef.current &&
+      questionsRef.current.length > 0
+    ) {
+      autoCompleteRef.current = true;
+
+      // Stop any active recording
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+        recognitionRef.current = null;
+      }
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+
+      // Build results from however many answers we have so far
+      const qs = questionsRef.current;
+      const answeredQs = qs.slice(0, Math.max(1, currentIndexRef.current + 1));
+      const answeredAnswers = answersRef.current;
+      const answeredScores = turnScoresRef.current;
+
+      // Fill missing answers/scores
+      for (let i = 0; i < answeredQs.length; i++) {
+        if (!answeredAnswers[i]) answeredAnswers[i] = "[No speech detected]";
+        if (!answeredScores[i]) answeredScores[i] = scoreAnswer(answeredAnswers[i]);
+      }
+
+      const comp = session.getCompany() ?? "";
+      const name = session.getCandidateName() ?? "";
+      const results = buildResults(answeredQs, answeredAnswers, answeredScores, comp, name);
+      session.setResults(results);
+      session.setInterviewComplete(true);
+
+      setIsComplete(true);
+      setTimeout(() => router.push("/debrief"), 2500);
+    }
+  }, [timerSeconds, timerMaxSecs, isComplete, router]);
 
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60);
@@ -211,6 +283,10 @@ export default function InterviewPage() {
 
   const currentQuestion = questions[currentIndex] ?? "";
 
+  // Timer color: warn when ≤ 60s remaining on countdown
+  const isTimerWarning = timerMaxSecs > 0 && timerSeconds <= 60 && timerSeconds > 0;
+  const isTimerCritical = timerMaxSecs > 0 && timerSeconds <= 20 && timerSeconds > 0;
+
   return (
     <div
       style={{
@@ -229,7 +305,7 @@ export default function InterviewPage() {
           justifyContent: "space-between",
           padding: "18px 32px",
           borderBottom: "1px solid var(--border-subtle)",
-          background: "rgba(5,5,8,0.8)",
+          background: "rgba(5,5,8,0.85)",
           backdropFilter: "blur(20px)",
           flexShrink: 0,
           zIndex: 10,
@@ -263,14 +339,21 @@ export default function InterviewPage() {
             style={{
               fontFamily: "var(--font-body)",
               fontSize: 14,
-              color: "var(--text-secondary)",
+              color: isTimerCritical
+                ? "#ef4444"
+                : isTimerWarning
+                ? "#ffb347"
+                : "var(--text-secondary)",
               fontVariantNumeric: "tabular-nums",
+              fontWeight: isTimerWarning ? 700 : 400,
+              transition: "color 0.3s",
             }}
           >
-            {formatTime(timerSeconds)}
+            {timerMaxSecs > 0 ? "⏱ " : ""}{formatTime(timerSeconds)}
           </span>
 
-          {isDemo && (
+          {/* Duration badge */}
+          {durationId === "demo" && (
             <span
               style={{
                 padding: "4px 10px",
@@ -285,6 +368,23 @@ export default function InterviewPage() {
               }}
             >
               DEMO
+            </span>
+          )}
+          {durationId === "full" && (
+            <span
+              style={{
+                padding: "4px 10px",
+                borderRadius: 6,
+                background: "rgba(239,68,68,0.15)",
+                border: "1px solid rgba(239,68,68,0.3)",
+                color: "#ef4444",
+                fontSize: 11,
+                fontFamily: "var(--font-body)",
+                fontWeight: 600,
+                letterSpacing: "0.08em",
+              }}
+            >
+              FULL THROTTLE
             </span>
           )}
         </div>
@@ -361,7 +461,7 @@ export default function InterviewPage() {
                   style={{
                     fontFamily: "var(--font-body)",
                     fontSize: 11,
-                    color: "var(--text-dim)",
+                    color: "var(--text-secondary)",
                     letterSpacing: "0.12em",
                     marginBottom: 12,
                   }}
