@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Sora, Space_Grotesk, Noto_Sans_JP } from "next/font/google";
 import "./globals.css";
-import ParticleBackground from "@/components/ParticleBackground";
+import ThemeAwareBackground from "@/components/ThemeAwareBackground";
 
 const sora = Sora({
   subsets: ["latin"],
@@ -42,7 +42,7 @@ export default function RootLayout({
       className={`${sora.variable} ${spaceGrotesk.variable} ${notoJP.variable}`}
     >
       <body className="antialiased">
-        <ParticleBackground />
+        <ThemeAwareBackground />
         <div style={{ position: "relative", zIndex: 1 }}>{children}</div>
       </body>
     </html>

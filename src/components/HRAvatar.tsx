@@ -58,7 +58,7 @@ export default function HRAvatar({ state }: HRAvatarProps) {
           height: 220,
           borderRadius: "50%",
           border: `1.5px dashed ${cfg.outerColor}`,
-          opacity: 0.35,
+          opacity: 0.7,
         }}
       />
 
@@ -72,7 +72,7 @@ export default function HRAvatar({ state }: HRAvatarProps) {
           height: 170,
           borderRadius: "50%",
           border: `1.5px solid ${cfg.outerColor}`,
-          opacity: 0.5,
+          opacity: 0.8,
         }}
       />
 
@@ -101,14 +101,14 @@ export default function HRAvatar({ state }: HRAvatarProps) {
           boxShadow:
             state === "speaking"
               ? [
-                  `0 0 30px ${cfg.coreColor}, 0 0 60px ${cfg.coreColor}`,
-                  `0 0 50px ${cfg.coreColor}, 0 0 80px ${cfg.coreColor}`,
-                  `0 0 30px ${cfg.coreColor}, 0 0 60px ${cfg.coreColor}`,
+                  `0 0 40px ${cfg.coreColor}, 0 0 80px ${cfg.coreColor}, 0 0 120px ${cfg.coreColor}`,
+                  `0 0 60px ${cfg.coreColor}, 0 0 100px ${cfg.coreColor}, 0 0 160px ${cfg.coreColor}`,
+                  `0 0 40px ${cfg.coreColor}, 0 0 80px ${cfg.coreColor}, 0 0 120px ${cfg.coreColor}`,
                 ]
               : [
-                  `0 0 20px ${cfg.coreColor}`,
-                  `0 0 35px ${cfg.coreColor}`,
-                  `0 0 20px ${cfg.coreColor}`,
+                  `0 0 30px ${cfg.coreColor}, 0 0 60px ${cfg.coreColor}`,
+                  `0 0 45px ${cfg.coreColor}, 0 0 80px ${cfg.coreColor}`,
+                  `0 0 30px ${cfg.coreColor}, 0 0 60px ${cfg.coreColor}`,
                 ],
         }}
         transition={{
@@ -159,7 +159,7 @@ export default function HRAvatar({ state }: HRAvatarProps) {
           bottom: -8,
           fontFamily: "var(--font-body)",
           fontSize: 11,
-          color: "var(--text-dim)",
+          color: "#8888aa",
           letterSpacing: "0.1em",
           textTransform: "uppercase",
         }}

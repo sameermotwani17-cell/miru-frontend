@@ -296,6 +296,7 @@ export default function InterviewPage() {
         display: "flex",
         flexDirection: "column",
         position: "relative",
+        backgroundColor: "#050508", // hard-stop — never show light canvas through
       }}
     >
       {/* Top bar */}
@@ -319,7 +320,7 @@ export default function InterviewPage() {
             style={{
               fontFamily: "var(--font-body)",
               fontSize: 13,
-              color: "var(--text-secondary)",
+              color: "#8888aa",
             }}
           >
             {company}
@@ -442,7 +443,7 @@ export default function InterviewPage() {
                   style={{
                     fontFamily: "var(--font-display)",
                     fontSize: "clamp(16px, 2.5vw, 22px)",
-                    color: "var(--text-primary)",
+                    color: "#f0f0ff",
                     lineHeight: 1.55,
                     fontWeight: 400,
                   }}
@@ -462,7 +463,7 @@ export default function InterviewPage() {
                   style={{
                     fontFamily: "var(--font-body)",
                     fontSize: 11,
-                    color: "var(--text-secondary)",
+                    color: "#8888aa",
                     letterSpacing: "0.12em",
                     marginBottom: 12,
                   }}
@@ -473,7 +474,7 @@ export default function InterviewPage() {
                   style={{
                     fontFamily: "var(--font-display)",
                     fontSize: "clamp(18px, 2.8vw, 26px)",
-                    color: "var(--text-primary)",
+                    color: "#f0f0ff",
                     lineHeight: 1.5,
                     fontWeight: 500,
                   }}
@@ -547,7 +548,7 @@ export default function InterviewPage() {
                   fontFamily: "var(--font-display)",
                   fontSize: 32,
                   fontWeight: 700,
-                  color: "var(--text-primary)",
+                  color: "#f0f0ff",
                   marginBottom: 12,
                 }}
               >
@@ -557,7 +558,7 @@ export default function InterviewPage() {
                 style={{
                   fontFamily: "var(--font-body)",
                   fontSize: 16,
-                  color: "var(--text-secondary)",
+                  color: "#8888aa",
                 }}
               >
                 Preparing your debrief{" "}
