@@ -95,6 +95,74 @@ body {
   box-shadow: var(--glow-primary);
 }
 
+/* ─── Page theming: light / dark ─────────────────────────────────── */
+
+/* Landing, onboarding, debrief — light particle background */
+.page-light {
+  --text-primary: #0d0d1a;
+  --text-secondary: #44445a;
+  --text-dim: #888899;
+  --border-subtle: rgba(108, 99, 255, 0.2);
+  --border-active: rgba(108, 99, 255, 0.5);
+}
+
+/* Interview page — fully dark */
+.page-dark {
+  --text-primary: #f0f0ff;
+  --text-secondary: #8888aa;
+  --text-dim: #44445a;
+}
+
+/* Dark glass cards AND any explicit dark surface within a light page —
+   restore the light-on-dark text variables so nested content stays readable */
+.page-light .glass-card,
+.page-light .dark-surface {
+  --text-primary: #f0f0ff;
+  --text-secondary: #8888aa;
+  --text-dim: #44445a;
+  --border-subtle: rgba(108, 99, 255, 0.15);
+  --border-active: rgba(108, 99, 255, 0.5);
+}
+
+/* Glass cards on light pages also get a slightly deeper dark surface */
+.page-light .glass-card {
+  background: rgba(15, 15, 30, 0.82);
+  border: 1px solid rgba(108, 99, 255, 0.25);
+}
+
+/* ─── Company insight card ───────────────────────────────────────── */
+
+/* Light card used for company_flag inside dark-background right column */
+.insight-card {
+  background: rgba(240, 240, 250, 0.95);
+  border: 1px solid rgba(108, 99, 255, 0.3);
+  border-top: 3px solid var(--accent-secondary);
+  color: #0d0d1a;
+  border-radius: 14px;
+  padding: 18px 22px;
+  overflow: hidden;
+}
+
+.insight-label {
+  display: block;
+  color: var(--accent-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  font-family: var(--font-body);
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+.insight-body {
+  color: #1a1a2e;
+  font-size: 14px;
+  line-height: 1.7;
+  font-family: var(--font-body);
+  margin: 0;
+}
+
+/* ─── Shimmer loading skeleton ───────────────────────────────────── */
 /* Shimmer skeleton */
 @keyframes shimmer {
   0% {
@@ -115,6 +183,19 @@ body {
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
   border-radius: 8px;
+}
+
+/* Named alias used for inline loading shimmer elements */
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(108, 99, 255, 0.08) 25%,
+    rgba(108, 99, 255, 0.18) 50%,
+    rgba(108, 99, 255, 0.08) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite linear;
+  border-radius: 4px;
 }
 
 /* Score bar base */

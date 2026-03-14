@@ -55,10 +55,12 @@ export default function LandingPage() {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+      className="page-light"
       style={{ minHeight: "100vh", overflowX: "hidden" }}
     >
       {/* Nav */}
       <nav
+        className="dark-surface"
         style={{
           position: "fixed",
           top: 0,
@@ -315,6 +317,7 @@ export default function LandingPage() {
             <motion.div
               key={c.name}
               variants={item}
+              className="dark-surface"
               style={{
                 padding: "12px 28px",
                 borderRadius: 8,

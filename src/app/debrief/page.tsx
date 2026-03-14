@@ -189,9 +189,10 @@ export default function DebriefPage() {
   });
   const company = session.getCompany() ?? "";
   const sessionId = session.getSessionId() ?? "";
+  const companyFlag = report.company_flag?.trim() || null;
 
   return (
-    <div style={{ minHeight: "100vh", paddingBottom: 120 }}>
+    <div className="page-light" style={{ minHeight: "100vh", paddingBottom: 120 }}>
 
       {/* Print-only header (hidden on screen) */}
       <div className="print-header">
@@ -203,7 +204,7 @@ export default function DebriefPage() {
 
       {/* Nav */}
       <nav
-        className="no-print"
+        className="no-print dark-surface"
         style={{
           position: "sticky",
           top: 0,
@@ -358,9 +359,15 @@ export default function DebriefPage() {
           </p>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-            {feedback.turns.map((turn, i) => (
-              <DebriefCard key={turn.question_id} turn={turn} index={i} />
-            ))}
+            {feedback.turns.length === 0 ? (
+              <p style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--text-page-muted)", fontStyle: "italic" }}>
+                No turn-by-turn feedback available for this session.
+              </p>
+            ) : (
+              feedback.turns.map((turn, i) => (
+                <DebriefCard key={turn.question_id} turn={turn} index={i} />
+              ))
+            )}
           </div>
         </section>
 
@@ -512,30 +519,36 @@ export default function DebriefPage() {
                 >
                   STRENGTHS
                 </p>
-                <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-                  {report.strengths.map((s, i) => (
-                    <li
-                      key={i}
-                      style={{
-                        fontFamily: "var(--font-body)",
-                        fontSize: 13,
-                        color: "var(--text-secondary)",
-                        lineHeight: 1.6,
-                        paddingBottom: 8,
-                        borderBottom:
-                          i < report.strengths.length - 1
-                            ? "1px solid var(--border-subtle)"
-                            : "none",
-                        marginBottom: 8,
-                        paddingLeft: 12,
-                        position: "relative",
-                      }}
-                    >
-                      <span style={{ position: "absolute", left: 0, color: "var(--accent-green)" }}>·</span>
-                      {s}
-                    </li>
-                  ))}
-                </ul>
+                {report.strengths.length === 0 ? (
+                  <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)", fontStyle: "italic" }}>
+                    No specific strengths noted.
+                  </p>
+                ) : (
+                  <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                    {report.strengths.map((s, i) => (
+                      <li
+                        key={i}
+                        style={{
+                          fontFamily: "var(--font-body)",
+                          fontSize: 13,
+                          color: "var(--text-secondary)",
+                          lineHeight: 1.6,
+                          paddingBottom: 8,
+                          borderBottom:
+                            i < report.strengths.length - 1
+                              ? "1px solid var(--border-subtle)"
+                              : "none",
+                          marginBottom: 8,
+                          paddingLeft: 12,
+                          position: "relative",
+                        }}
+                      >
+                        <span style={{ position: "absolute", left: 0, color: "var(--accent-green)" }}>·</span>
+                        {s}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
 
               {/* Areas to Improve */}
@@ -552,30 +565,36 @@ export default function DebriefPage() {
                 >
                   AREAS TO IMPROVE
                 </p>
-                <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-                  {report.improvement_areas.map((s, i) => (
-                    <li
-                      key={i}
-                      style={{
-                        fontFamily: "var(--font-body)",
-                        fontSize: 13,
-                        color: "var(--text-secondary)",
-                        lineHeight: 1.6,
-                        paddingBottom: 8,
-                        borderBottom:
-                          i < report.improvement_areas.length - 1
-                            ? "1px solid var(--border-subtle)"
-                            : "none",
-                        marginBottom: 8,
-                        paddingLeft: 12,
-                        position: "relative",
-                      }}
-                    >
-                      <span style={{ position: "absolute", left: 0, color: "var(--accent-warm)" }}>·</span>
-                      {s}
-                    </li>
-                  ))}
-                </ul>
+                {report.improvement_areas.length === 0 ? (
+                  <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)", fontStyle: "italic" }}>
+                    No improvement areas noted.
+                  </p>
+                ) : (
+                  <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                    {report.improvement_areas.map((s, i) => (
+                      <li
+                        key={i}
+                        style={{
+                          fontFamily: "var(--font-body)",
+                          fontSize: 13,
+                          color: "var(--text-secondary)",
+                          lineHeight: 1.6,
+                          paddingBottom: 8,
+                          borderBottom:
+                            i < report.improvement_areas.length - 1
+                              ? "1px solid var(--border-subtle)"
+                              : "none",
+                          marginBottom: 8,
+                          paddingLeft: 12,
+                          position: "relative",
+                        }}
+                      >
+                        <span style={{ position: "absolute", left: 0, color: "var(--accent-warm)" }}>·</span>
+                        {s}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
 
               {/* Recommended Focus */}
@@ -612,50 +631,19 @@ export default function DebriefPage() {
                 </div>
               )}
 
-              {/* Company Flag (moved from Section 04) */}
-              <div
-                style={{
-                  padding: "18px 22px",
-                  borderRadius: 14,
-                  border: "1px solid rgba(59,130,246,0.3)",
-                  background: "rgba(59,130,246,0.05)",
-                  position: "relative",
-                  overflow: "hidden",
-                }}
-              >
-                <div
-                  style={{
-                    position: "absolute",
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    height: 2,
-                    background: "linear-gradient(90deg, var(--accent-primary), var(--accent-secondary))",
-                  }}
-                />
-                <p
-                  style={{
-                    fontSize: 11,
-                    color: "var(--accent-secondary)",
-                    letterSpacing: "0.1em",
-                    fontFamily: "var(--font-body)",
-                    fontWeight: 600,
-                    marginBottom: 10,
-                  }}
-                >
-                  {company.toUpperCase()} INSIGHT
-                </p>
-                <p
-                  style={{
-                    fontFamily: "var(--font-body)",
-                    fontSize: 13,
-                    color: "var(--text-primary)",
-                    lineHeight: 1.7,
-                  }}
-                >
-                  {report.company_flag}
-                </p>
-              </div>
+              {/* Company Flag */}
+              {loading ? (
+                <div className="insight-card">
+                  <div className="shimmer" style={{ height: 12, width: 120, marginBottom: 12 }} />
+                  <div className="shimmer" style={{ height: 14, width: "90%", marginBottom: 8 }} />
+                  <div className="shimmer" style={{ height: 14, width: "70%" }} />
+                </div>
+              ) : companyFlag ? (
+                <div className="insight-card">
+                  <span className="insight-label">{company.toUpperCase()} INSIGHT</span>
+                  <p className="insight-body">{companyFlag}</p>
+                </div>
+              ) : null}
             </div>
           </div>
         </section>

@@ -289,6 +289,7 @@ export default function InterviewPage() {
 
   return (
     <div
+      className="page-dark"
       style={{
         height: "100vh",
         overflow: "hidden",

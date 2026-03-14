@@ -178,6 +178,7 @@ export default function OnboardingPage() {
 
   return (
     <div
+      className="page-light"
       style={{
         minHeight: "100vh",
         display: "flex",
