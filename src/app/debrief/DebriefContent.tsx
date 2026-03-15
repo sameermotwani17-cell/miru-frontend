@@ -17,7 +17,7 @@ type DebriefApiResponse = Partial<FullResults> & {
   turn_feedback?: unknown[];
 };
 
-const MAX_ATTEMPTS = 15;
+const MAX_ATTEMPTS = 20;
 const INTERVAL_MS = 2000;
 
 async function pollForResults(
