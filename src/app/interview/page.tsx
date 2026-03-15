@@ -7,7 +7,7 @@ import MiruLogo from "@/components/MiruLogo";
 import HRAvatar from "@/components/HRAvatar";
 import VoiceInput from "@/components/VoiceInput";
 import { session } from "@/lib/session";
-import { speak } from "@/lib/tts";
+import { speak, stopSpeech } from "@/lib/tts";
 import { sendInterviewTurn } from "@/lib/api";
 import {
   startSpeechRecognition,
@@ -262,8 +262,11 @@ function InterviewPage() {
 
     try {
       const res = await sendTurnWithRetry("start");
-      const sid = machine.sessionId ?? crypto.randomUUID();
-      if (res.interview_complete) {
+      const sid = machine.sessionId;
+      if (
+        res.interview_complete === true &&
+        res.next_question === null
+      ) {
         if (!sid) {
           console.error("Missing session_id — cannot redirect to debrief");
           return;
@@ -278,9 +281,8 @@ function InterviewPage() {
           dispatch({ type: "APPEND_MESSAGE", role: "agent", text: res.interviewer_response.trim() });
         }
         dispatch({ type: "COMPLETED" });
-        setTimeout(() => {
-          window.location.href = `/debrief?session_id=${sid}`;
-        }, 1500);
+        stopSpeech();
+        router.push(`/debrief?session_id=${sid}`);
         return;
       }
 
@@ -342,8 +344,11 @@ function InterviewPage() {
 
       try {
         const res = await sendTurnWithRetry(safeAnswer);
-        const sid = machine.sessionId ?? crypto.randomUUID();
-        if (res.interview_complete) {
+        const sid = machine.sessionId;
+        if (
+          res.interview_complete === true &&
+          res.next_question === null
+        ) {
           if (!sid) {
             console.error("Missing session_id — cannot redirect to debrief");
             return;
@@ -359,9 +364,8 @@ function InterviewPage() {
           }
           session.setInterviewComplete(true);
           dispatch({ type: "COMPLETED" });
-          setTimeout(() => {
-            window.location.href = `/debrief?session_id=${sid}`;
-          }, 1500);
+          stopSpeech();
+          router.push(`/debrief?session_id=${sid}`);
           return;
         }
 
@@ -459,20 +463,6 @@ function InterviewPage() {
       void executeStartTurn();
     }
   }, [machine.status, machine.sessionId, executeStartTurn]);
-
-  // Fallback redirect: covers timer-expiry path (finalizeInterview) which doesn't
-  // set its own redirect. Uses window.location.href + a delay longer than the
-  // 1500ms used in executeAnswerTurn/executeStartTurn so it only fires if those
-  // paths somehow didn't navigate (prevents immediate race / blank screen).
-  useEffect(() => {
-    if (machine.status === "COMPLETED" && machine.sessionId) {
-      const sid = machine.sessionId;
-      const t = setTimeout(() => {
-        window.location.href = `/debrief?session_id=${sid}`;
-      }, 2000);
-      return () => clearTimeout(t);
-    }
-  }, [machine.status, machine.sessionId]);
 
   useEffect(() => {
     if (timerMaxSecs > 0 && timerSeconds === 0 && machine.status !== "COMPLETED") {

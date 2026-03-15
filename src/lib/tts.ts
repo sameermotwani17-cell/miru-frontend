@@ -18,3 +18,9 @@ export function speak(texts: string | string[], lang: string = "en-US") {
 
   speakNext(0);
 }
+
+export function stopSpeech() {
+  if (typeof window !== "undefined") {
+    window.speechSynthesis?.cancel();
+  }
+}

@@ -13,12 +13,27 @@ import { normalizeScores } from "@/lib/resultsNormalizer";
 import { getSessionId } from "@/lib/getSessionId";
 
 type DebriefApiResponse = Partial<FullResults> & {
+  status?: string;
   scores?: Partial<RadarScores>;
   turn_feedback?: unknown[];
 };
 
-const MAX_ATTEMPTS = 20;
+const MAX_ATTEMPTS = 8;
 const INTERVAL_MS = 2000;
+
+function isReadyResponse(data: DebriefApiResponse | null): boolean {
+  if (!data) return false;
+
+  const status = typeof data.status === "string" ? data.status.toLowerCase() : "";
+  return status === "ready" || (Array.isArray(data.turn_feedback) && data.turn_feedback.length > 0);
+}
+
+function isNotReadyResponse(data: DebriefApiResponse | null): boolean {
+  if (!data) return false;
+
+  const status = typeof data.status === "string" ? data.status.toLowerCase() : "";
+  return status === "results_not_ready";
+}
 
 async function pollForResults(
   sessionId: string,
@@ -32,11 +47,17 @@ async function pollForResults(
       `/api/interview/results?session_id=${encodeURIComponent(sessionId)}`
     ).catch(() => null);
 
-    if (res?.ok) {
-      const data = (await res.json()) as DebriefApiResponse;
-      if (Array.isArray(data?.turn_feedback) && data.turn_feedback.length > 0) {
-        return data;
-      }
+    const data = res
+      ? ((await res.json().catch(() => null)) as DebriefApiResponse | null)
+      : null;
+
+    if (data && isReadyResponse(data)) {
+      return data;
+    }
+
+    if (isNotReadyResponse(data)) {
+      await new Promise((resolve) => setTimeout(resolve, INTERVAL_MS));
+      continue;
     }
 
     await new Promise((resolve) => setTimeout(resolve, INTERVAL_MS));
