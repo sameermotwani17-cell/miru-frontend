@@ -123,11 +123,22 @@ function normalizeCoachingTurns(raw: DebriefApiResponse): CoachingTurn[] {
         toNumber(turn.final_score) ??
         toNumber(turn.overall_score);
       const computedScore = explicitScore ?? avgFromScores(turn.scores);
+      const question =
+        turn.question ??
+        turn.prompt ??
+        turn.question_text ??
+        turn.question_prompt ??
+        "";
+      const answer =
+        turn.answer ??
+        turn.user_answer ??
+        turn.candidate_answer ??
+        "";
 
       return {
         questionId: String(turn.question_id ?? `q${index + 1}`),
-        question: String(turn.question ?? turn.prompt ?? turn.question_text ?? ""),
-        answer: String(turn.answer ?? turn.user_answer ?? ""),
+        question: String(question),
+        answer: String(answer),
         score: Math.max(0, Math.min(10, computedScore || 0)),
         feedback: String(turn.feedback ?? turn.coaching_feedback ?? "No feedback available."),
         better_example: String(
