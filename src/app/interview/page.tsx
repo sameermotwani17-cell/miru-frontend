@@ -553,9 +553,9 @@ function InterviewPage() {
       },
       {
         lang: machine.languageMode === "jp" ? "ja-JP" : "en-US",
-        // Explicit 1800ms silence timeout — matches the default in voice.ts but
+        // Explicit 3000ms silence timeout — matches the default in voice.ts but
         // stated here so it's visible and easy to tune per-language in future.
-        silenceTimeoutMs: 1800,
+        silenceTimeoutMs: 3000,
         onError: (message) => {
           dispatch({ type: "ERROR", error: message });
         },

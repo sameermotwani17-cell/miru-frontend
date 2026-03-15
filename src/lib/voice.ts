@@ -37,13 +37,12 @@ export interface StartSpeechRecognitionOptions {
   onEnd?: () => void;
 }
 
-// How long silence must persist (after the minimum speech window) before we
-// auto-stop. 1800ms gives natural pause tolerance between sentences.
-const DEFAULT_SILENCE_TIMEOUT_MS = 1800;
+// How long silence must persist (after the minimum speech duration) before we
+// auto-stop.
+const DEFAULT_SILENCE_TIMEOUT_MS = 3000;
 
-// For the first MIN_SPEECH_WINDOW_MS after speech begins, silence cannot end
-// the session — prevents mid-sentence cutoffs on brief pauses.
-const MIN_SPEECH_WINDOW_MS = 2000;
+// Minimum speech duration before silence can auto-end capture.
+const MIN_SPEECH_DURATION_MS = 800;
 
 export function startSpeechRecognition(
   onResult: (text: string) => void,
@@ -93,13 +92,13 @@ export function startSpeechRecognition(
     const now = Date.now();
     const speechElapsed = speechStartTime !== null ? now - speechStartTime : 0;
 
-    // If we are still inside the minimum speech window, extend the effective
-    // timeout so it expires no earlier than MIN_SPEECH_WINDOW_MS from when
+    // If we are still inside the minimum speech duration, extend the effective
+    // timeout so it expires no earlier than MIN_SPEECH_DURATION_MS from when
     // speech first started. This acts as both the minimum window AND the
     // resume buffer — any new speech resets this same timer.
     const effectiveTimeout =
-      speechElapsed < MIN_SPEECH_WINDOW_MS
-        ? silenceTimeoutMs + (MIN_SPEECH_WINDOW_MS - speechElapsed)
+      speechElapsed < MIN_SPEECH_DURATION_MS
+        ? silenceTimeoutMs + (MIN_SPEECH_DURATION_MS - speechElapsed)
         : silenceTimeoutMs;
 
     silenceTimer = setTimeout(() => {
