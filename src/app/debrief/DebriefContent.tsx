@@ -27,8 +27,9 @@ type CoachingTurn = {
   better_example: string;
 };
 
-const POLL_ATTEMPTS = 12;
-const POLL_DELAY_MS = 700;
+// Increased polling window to allow LLM evaluation to complete (up to 45 s)
+const POLL_ATTEMPTS = 30;
+const POLL_DELAY_MS = 1500;
 
 function isReadyResponse(data: DebriefApiResponse | null): boolean {
   if (!data) return false;
@@ -106,12 +107,12 @@ function toNumber(value: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function avgFromScores(scores: unknown): number {
-  if (!scores || typeof scores !== "object") return 0;
+function avgFromScores(scores: unknown): number | undefined {
+  if (!scores || typeof scores !== "object") return undefined;
   const values = Object.values(scores as Record<string, unknown>)
     .map((v) => toNumber(v))
     .filter((v): v is number => v !== null);
-  if (!values.length) return 0;
+  if (!values.length) return undefined;
   return values.reduce((a, b) => a + b, 0) / values.length;
 }
 
@@ -130,13 +131,17 @@ function normalizeCoachingTurns(raw: DebriefApiResponse): CoachingTurn[] {
         toNumber(turn.score) ??
         toNumber(turn.final_score) ??
         toNumber(turn.overall_score);
-      const computedScore = explicitScore ?? avgFromScores(turn.scores);
+      const computedScore =
+        explicitScore ??
+        avgFromScores(turn.scores) ??
+        avgFromScores(turn.evaluation);
       const question =
         String(
           turn.question ??
           turn.prompt ??
           turn.question_text ??
           turn.question_prompt ??
+          turn.question_category ??
           ""
         ) || "Interview Question";
       const answer =
@@ -152,7 +157,12 @@ function normalizeCoachingTurns(raw: DebriefApiResponse): CoachingTurn[] {
         question,
         answer,
         score: Math.max(0, Math.min(10, computedScore || 0)),
-        feedback: String(turn.feedback ?? turn.coaching_feedback ?? "No feedback available."),
+        feedback: String(
+          turn.feedback ??
+          turn.coaching_feedback ??
+          (turn.evaluation as Record<string, unknown> | undefined)?.notes ??
+          "No feedback available."
+        ),
         better_example: String(
           turn.better_example ?? turn.rewrite ?? turn.improved_answer ?? "No coaching example available."
         ),
