@@ -494,6 +494,13 @@ export default function InterviewPage() {
     }
   }, [machine.status, machine.sessionId, executeStartTurn]);
 
+  // Fallback redirect: when interview completes via timer or any path
+  useEffect(() => {
+    if (machine.status === "COMPLETED" && machine.sessionId) {
+      router.push(`/debrief?session_id=${machine.sessionId}`);
+    }
+  }, [machine.status, machine.sessionId, router]);
+
   useEffect(() => {
     if (timerMaxSecs > 0 && timerSeconds === 0 && machine.status !== "COMPLETED") {
       dispatch({ type: "WRAP_UP" });

@@ -1,19 +1,13 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import MiruLogo from "@/components/MiruLogo";
 import CompanyCard from "@/components/CompanyCard";
 import { COMPANIES } from "@/lib/types";
 import { session } from "@/lib/session";
 import { startInterview } from "@/lib/api";
-
-const slideVariants = {
-  enter: (dir: number) => ({ x: dir > 0 ? 60 : -60, opacity: 0 }),
-  center: { x: 0, opacity: 1 },
-  exit: (dir: number) => ({ x: dir < 0 ? 60 : -60, opacity: 0 }),
-};
 
 type LanguageMode = "jp" | "english";
 type DurationMode = "demo" | "10min" | "15min" | "30min" | "60min";
@@ -103,7 +97,6 @@ const BADGE_STYLES: Record<"amber" | "indigo" | "red", React.CSSProperties> = {
 export default function OnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
-  const [dir, setDir] = useState(1);
 
   const [name, setName] = useState("");
   const [role, setRole] = useState("");
@@ -117,8 +110,8 @@ export default function OnboardingPage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const goNext = () => { setDir(1); setStep((s) => s + 1); };
-  const goBack = () => { setDir(-1); setStep((s) => s - 1); };
+  const goNext = () => { setStep((s) => s + 1); };
+  const goBack = () => { setStep((s) => s - 1); };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -257,17 +250,8 @@ export default function OnboardingPage() {
 
       {/* Step content */}
       <div style={{ width: "100%", maxWidth: 640, position: "relative" }}>
-        <AnimatePresence mode="wait" custom={dir}>
           {step === 1 && (
-            <motion.div
-              key="step1"
-              custom={dir}
-              variants={slideVariants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            >
+            <div>
               <div
                 className="glass-card"
                 style={{ padding: "40px 36px", position: "relative", overflow: "hidden" }}
@@ -304,19 +288,11 @@ export default function OnboardingPage() {
 
                 <NavButtons onNext={goNext} canNext={canProceed1} hideBack />
               </div>
-            </motion.div>
+            </div>
           )}
 
           {step === 2 && (
-            <motion.div
-              key="step2"
-              custom={dir}
-              variants={slideVariants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            >
+            <div>
               <div
                 className="glass-card"
                 style={{ padding: "40px 36px", position: "relative", overflow: "hidden" }}
@@ -360,19 +336,11 @@ export default function OnboardingPage() {
 
                 <NavButtons onBack={goBack} onNext={goNext} canNext={canProceed2} />
               </div>
-            </motion.div>
+            </div>
           )}
 
           {step === 3 && (
-            <motion.div
-              key="step3"
-              custom={dir}
-              variants={slideVariants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            >
+            <div>
               <div
                 className="glass-card"
                 style={{ padding: "40px 36px", position: "relative", overflow: "hidden" }}
@@ -626,9 +594,7 @@ export default function OnboardingPage() {
 
                   {/* Error */}
                   {error && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -8 }}
-                      animate={{ opacity: 1, y: 0 }}
+                    <div
                       style={{
                         padding: "14px 18px",
                         borderRadius: 10,
@@ -649,7 +615,7 @@ export default function OnboardingPage() {
                       >
                         ×
                       </button>
-                    </motion.div>
+                    </div>
                   )}
                 </div>
 
@@ -670,9 +636,8 @@ export default function OnboardingPage() {
                   }}
                 />
               </div>
-            </motion.div>
+            </div>
           )}
-        </AnimatePresence>
       </div>
     </div>
   );
