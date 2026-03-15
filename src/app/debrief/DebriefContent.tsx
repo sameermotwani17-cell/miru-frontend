@@ -7,7 +7,7 @@ import MiruLogo from "@/components/MiruLogo";
 import MiruRadarChart from "@/components/MiruRadarChart";
 import ScoreBar from "@/components/ScoreBar";
 import { session } from "@/lib/session";
-import type { FullResults, RadarScores } from "@/lib/types";
+import type { FullResults, FeedbackObject, RadarScores } from "@/lib/types";
 import { DIMENSION_LABELS } from "@/lib/types";
 
 function SectionHeader({ label, title }: { label: string; title: string }) {
@@ -64,6 +64,108 @@ function getScoreColor(score: number): string {
   return "var(--accent-warm)";
 }
 
+// Safely render feedback whether the backend returns a plain string or a
+// structured object { strengths, areas_for_improvement, summary }.
+// This is the root cause of React error #31 — never render a plain object.
+function renderFeedback(fb: string | FeedbackObject | null | undefined) {
+  if (!fb) {
+    return (
+      <p
+        style={{
+          fontFamily: "var(--font-body)",
+          fontSize: 14,
+          color: "var(--text-page-body)",
+          lineHeight: 1.7,
+        }}
+      >
+        No feedback available for this session.
+      </p>
+    );
+  }
+
+  // Plain string path — the normal case
+  if (typeof fb === "string") {
+    return (
+      <p
+        style={{
+          fontFamily: "var(--font-body)",
+          fontSize: 14,
+          color: "var(--text-page-body)",
+          lineHeight: 1.7,
+        }}
+      >
+        {fb}
+      </p>
+    );
+  }
+
+  // Structured object path — backend returned { strengths, areas_for_improvement, summary }
+  const subsectionLabel = (text: string, color: string) => (
+    <p
+      style={{
+        fontSize: 11,
+        color,
+        letterSpacing: "0.1em",
+        fontFamily: "var(--font-body)",
+        fontWeight: 600,
+        marginBottom: 6,
+        textTransform: "uppercase" as const,
+      }}
+    >
+      {text}
+    </p>
+  );
+
+  const bodyText = (text: string) => (
+    <p
+      style={{
+        fontFamily: "var(--font-body)",
+        fontSize: 14,
+        color: "var(--text-page-body)",
+        lineHeight: 1.7,
+        marginBottom: 0,
+      }}
+    >
+      {text}
+    </p>
+  );
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      {fb.summary && (
+        <div>
+          {subsectionLabel("Summary", "var(--accent-gold)")}
+          {bodyText(fb.summary)}
+        </div>
+      )}
+      {fb.strengths && (
+        <div>
+          {subsectionLabel("Strengths", "var(--accent-green)")}
+          {bodyText(fb.strengths)}
+        </div>
+      )}
+      {fb.areas_for_improvement && (
+        <div>
+          {subsectionLabel("Areas for Improvement", "var(--accent-warm)")}
+          {bodyText(fb.areas_for_improvement)}
+        </div>
+      )}
+      {!fb.summary && !fb.strengths && !fb.areas_for_improvement && (
+        <p
+          style={{
+            fontFamily: "var(--font-body)",
+            fontSize: 14,
+            color: "var(--text-page-body)",
+            lineHeight: 1.7,
+          }}
+        >
+          No feedback available for this session.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function DebriefContent() {
   const router = useRouter();
   const [results, setResults] = useState<FullResults | null>(null);
@@ -93,6 +195,8 @@ export default function DebriefContent() {
         const data: FullResults = {
           radar_scores: raw.radar_scores ?? raw.scores ?? { communication: 0, clarity: 0, cultural_fit: 0, problem_solving: 0 },
           transcript: raw.transcript ?? [],
+          // Preserve the full value — may be a string OR a FeedbackObject.
+          // renderFeedback() handles both shapes; never coerce to "" here.
           feedback: raw.feedback ?? "",
           hiring_signal: raw.hiring_signal ?? "",
         };
@@ -221,7 +325,9 @@ export default function DebriefContent() {
     problem_solving: Number(rawScores.problem_solving ?? 0),
   };
   const transcript = results.transcript ?? [];
-  const feedback = results.feedback ?? "";
+  // Keep the raw value (string or FeedbackObject) — renderFeedback() handles both shapes.
+  // Using ?? null instead of ?? "" so a missing field renders the "no feedback" fallback.
+  const feedback = results.feedback ?? null;
   const hiring_signal = results.hiring_signal ?? "";
 
   const radarKeys = Object.keys(radar_scores) as (keyof RadarScores)[];
@@ -407,16 +513,7 @@ export default function DebriefContent() {
             >
               OVERALL ASSESSMENT
             </p>
-            <p
-              style={{
-                fontFamily: "var(--font-body)",
-                fontSize: 14,
-                color: "var(--text-page-body)",
-                lineHeight: 1.7,
-              }}
-            >
-              {feedback || "No feedback available for this session."}
-            </p>
+            {renderFeedback(feedback)}
           </div>
         </section>
 

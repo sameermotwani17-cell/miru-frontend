@@ -29,10 +29,19 @@ export interface FinalReport {
   overall_scores: RadarScores;
 }
 
+// Backend may return feedback as a structured object or as a plain string.
+// Both shapes must be handled defensively in the UI.
+export interface FeedbackObject {
+  strengths?: string;
+  areas_for_improvement?: string;
+  summary?: string;
+}
+
 export interface FullResults {
   radar_scores: RadarScores;
   transcript: TranscriptHistoryItem[];
-  feedback: string;
+  // Backend sometimes returns a structured object instead of a plain string.
+  feedback: string | FeedbackObject;
   hiring_signal: string;
 }
 

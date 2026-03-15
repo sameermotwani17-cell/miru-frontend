@@ -141,7 +141,13 @@ export default function DebriefCard({ turn, index }: DebriefCardProps) {
             lineHeight: 1.6,
           }}
         >
-          {turn.feedback}
+          {typeof turn.feedback === "string"
+            ? turn.feedback || "—"
+            : turn.feedback && typeof turn.feedback === "object"
+            ? (turn.feedback as { summary?: string }).summary ??
+              (turn.feedback as { strengths?: string }).strengths ??
+              "—"
+            : "—"}
         </p>
       </div>
 
