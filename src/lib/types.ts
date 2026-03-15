@@ -1,8 +1,9 @@
 export interface RadarScores {
-  communication: number;
-  clarity: number;
+  wa_teamwork: number;
+  loyalty_commitment: number;
+  humility: number;
+  kaizen_growth: number;
   cultural_fit: number;
-  problem_solving: number;
 }
 
 export interface TranscriptHistoryItem {
@@ -72,10 +73,11 @@ export interface TurnResponse {
 }
 
 export interface InterviewScores {
-  communication: number;
-  clarity: number;
+  wa_teamwork: number;
+  loyalty_commitment: number;
+  humility: number;
+  kaizen_growth: number;
   cultural_fit: number;
-  problem_solving: number;
 }
 
 export interface InterviewTurnResponse {
@@ -90,10 +92,11 @@ export function mapInterviewScoresToRadar(scores: InterviewScores): RadarScores 
   // Coerce to number so null/undefined from partial API responses never
   // propagate into score calculations or chart rendering.
   return {
-    communication: Number(scores.communication ?? 0),
-    clarity: Number(scores.clarity ?? 0),
+    wa_teamwork: Number(scores.wa_teamwork ?? 0),
+    loyalty_commitment: Number(scores.loyalty_commitment ?? 0),
+    humility: Number(scores.humility ?? 0),
+    kaizen_growth: Number(scores.kaizen_growth ?? 0),
     cultural_fit: Number(scores.cultural_fit ?? 0),
-    problem_solving: Number(scores.problem_solving ?? 0),
   };
 }
 
@@ -110,10 +113,11 @@ export function getScoreLevel(score: number): ScoreLevel {
 }
 
 export const DIMENSION_LABELS: Record<keyof RadarScores, string> = {
-  communication: "Communication",
-  clarity: "Clarity",
+  wa_teamwork: "Wa / Teamwork",
+  loyalty_commitment: "Loyalty",
+  humility: "Humility",
+  kaizen_growth: "Kaizen Growth",
   cultural_fit: "Cultural Fit",
-  problem_solving: "Problem Solving",
 };
 
 export const COMPANIES = [
@@ -227,58 +231,3 @@ export const COMPANY_FLAGS: Record<string, string> = {
   Uniqlo: "Uniqlo values 'genchi genbutsu' — going directly to the source to understand reality. Hands-on problem-solving and direct customer empathy are valued far above abstract strategic thinking.",
 };
 
-// Score a single answer locally (used in interview page)
-export function scoreAnswer(answer: string): RadarScores {
-  const text = answer.toLowerCase().trim();
-  const words = text.split(/\s+/).filter((w) => w.length > 2);
-  const len = words.length;
-
-  const base = len === 0 ? 2 : Math.min(7.5, 3 + len * 0.18);
-
-  const kw = (keywords: string[]) =>
-    Math.min(2.0, keywords.filter((k) => text.includes(k)).length * 0.6);
-
-  const clamp = (v: number) => +Math.min(10, Math.max(1, v)).toFixed(1);
-
-  return {
-    communication: clamp(base + kw(["explain", "clearly", "articulate", "communicate", "describe", "express", "present"])),
-    clarity: clamp(base + kw(["specific", "clear", "concrete", "example", "detail", "precise", "structured", "focused"])),
-    cultural_fit: clamp(base + kw(["team", "collaborate", "culture", "value", "align", "adapt", "respect", "together", "harmony"])),
-    problem_solving: clamp(base + kw(["solve", "analyze", "approach", "strategy", "improve", "solution", "identify", "resolve", "optimize"])),
-  };
-}
-
-// Build full results from local interview data
-export function buildResults(
-  questions: string[],
-  answers: string[],
-  turnScores: RadarScores[],
-  company: string,
-  name: string
-): FullResults {
-  const keys = Object.keys(turnScores[0]) as (keyof RadarScores)[];
-  const radar_scores = Object.fromEntries(
-    keys.map((k) => [
-      k,
-      +(turnScores.reduce((s, t) => s + t[k], 0) / turnScores.length).toFixed(1),
-    ])
-  ) as unknown as RadarScores;
-
-  const avgOverall = Object.values(radar_scores).reduce((a, b) => a + b, 0) / 4;
-  const readiness = avgOverall >= 7 ? "strong" : avgOverall >= 5 ? "developing" : "early-stage";
-
-  return {
-    radar_scores,
-    transcript: questions.map((q, i) => ({
-      question_id: `q${i + 1}`,
-      question: q,
-      user_answer: answers[i] ?? "",
-    })),
-    feedback: `${name} demonstrated ${readiness} cultural readiness for ${company}. Communication was ${avgOverall >= 6 ? "clear and structured with notable moments of alignment" : "present but would benefit substantially from more specific examples and culturally-aware framing"}.`,
-    hiring_signal: avgOverall >= 7
-      ? "Strong candidate. Proceed to next round."
-      : avgOverall >= 5
-      ? "Potential candidate. Further evaluation recommended."
-      : "Not ready. Significant improvement needed before reapplication.",
-  };
-}

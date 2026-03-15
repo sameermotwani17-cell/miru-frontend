@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import MiruLogo from "@/components/MiruLogo";
@@ -9,6 +9,41 @@ import ScoreBar from "@/components/ScoreBar";
 import { session } from "@/lib/session";
 import type { FullResults, FeedbackObject, RadarScores } from "@/lib/types";
 import { DIMENSION_LABELS } from "@/lib/types";
+import { normalizeScores } from "@/lib/resultsNormalizer";
+import { getSessionId } from "@/lib/getSessionId";
+
+type DebriefApiResponse = Partial<FullResults> & {
+  scores?: Partial<RadarScores>;
+  turn_feedback?: unknown[];
+};
+
+const MAX_ATTEMPTS = 15;
+const INTERVAL_MS = 2000;
+
+async function pollForResults(
+  sessionId: string,
+  onAttempt: (attempt: number, maxAttempts: number) => void
+): Promise<DebriefApiResponse> {
+  for (let i = 0; i < MAX_ATTEMPTS; i++) {
+    const attempt = i + 1;
+    onAttempt(attempt, MAX_ATTEMPTS);
+
+    const res = await fetch(
+      `/api/interview/results?session_id=${encodeURIComponent(sessionId)}`
+    ).catch(() => null);
+
+    if (res?.ok) {
+      const data = (await res.json()) as DebriefApiResponse;
+      if (Array.isArray(data?.turn_feedback) && data.turn_feedback.length > 0) {
+        return data;
+      }
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, INTERVAL_MS));
+  }
+
+  throw new Error("Debrief generation timeout");
+}
 
 function SectionHeader({ label, title }: { label: string; title: string }) {
   return (
@@ -64,9 +99,6 @@ function getScoreColor(score: number): string {
   return "var(--accent-warm)";
 }
 
-// Safely render feedback whether the backend returns a plain string or a
-// structured object { strengths, areas_for_improvement, summary }.
-// This is the root cause of React error #31 — never render a plain object.
 function renderFeedback(fb: string | FeedbackObject | null | undefined) {
   if (!fb) {
     return (
@@ -83,7 +115,6 @@ function renderFeedback(fb: string | FeedbackObject | null | undefined) {
     );
   }
 
-  // Plain string path — the normal case
   if (typeof fb === "string") {
     return (
       <p
@@ -99,7 +130,6 @@ function renderFeedback(fb: string | FeedbackObject | null | undefined) {
     );
   }
 
-  // Structured object path — backend returned { strengths, areas_for_improvement, summary }
   const subsectionLabel = (text: string, color: string) => (
     <p
       style={{
@@ -170,53 +200,46 @@ export default function DebriefContent() {
   const router = useRouter();
   const [results, setResults] = useState<FullResults | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMessage, setLoadingMessage] = useState("");
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search);
-    const id = searchParams.get("session_id") ?? session.getSessionId();
+  const loadResults = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    setLoadingMessage(`MIRU is analyzing your interview... Attempt 1 / ${MAX_ATTEMPTS}`);
+
+    const id = getSessionId();
     if (!id) {
-      console.error("No session_id found in URL");
-      router.push("/");
+      setError("Session not found. Please start a new interview.");
+      setLoading(false);
       return;
     }
 
     session.setSessionId(id);
 
-    const loadResults = async () => {
-      try {
-        const response = await fetch(`/api/interview/results?session_id=${encodeURIComponent(id)}`);
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-        const raw = (await response.json()) as FullResults & { scores?: RadarScores };
-        console.log("Debrief API response:", raw);
-        // Normalize schema: backend may return `scores` instead of `radar_scores`
-        const data: FullResults = {
-          radar_scores: raw.radar_scores ?? raw.scores ?? { communication: 0, clarity: 0, cultural_fit: 0, problem_solving: 0 },
-          transcript: raw.transcript ?? [],
-          // Preserve the full value — may be a string OR a FeedbackObject.
-          // renderFeedback() handles both shapes; never coerce to "" here.
-          feedback: raw.feedback ?? "",
-          hiring_signal: raw.hiring_signal ?? "",
-        };
-        setResults(data);
-        session.setResults(data);
-      } catch (err) {
-        console.error("Failed to load interview results", err);
-        const stored = session.getResults();
-        if (stored) {
-          setResults(stored);
-        } else {
-          setError("No results found. Please complete an interview first.");
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
+    try {
+      const raw = await pollForResults(id, (attempt, maxAttempts) => {
+        setLoadingMessage(`MIRU is analyzing your interview... Attempt ${attempt} / ${maxAttempts}`);
+      });
 
+      const normalized: FullResults = {
+        radar_scores: normalizeScores(raw),
+        transcript: Array.isArray(raw.transcript) ? raw.transcript : [],
+        feedback: raw.feedback ?? "",
+        hiring_signal: raw.hiring_signal ?? "",
+      };
+
+      setResults(normalized);
+    } catch {
+      setError("Debrief generation took longer than expected.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
     void loadResults();
-  }, [router]);
+  }, [loadResults]);
 
   const handlePracticeAgain = () => {
     session.clearForNewSession();
@@ -258,7 +281,7 @@ export default function DebriefContent() {
             fontSize: 14,
           }}
         >
-          Preparing your debrief…
+          {loadingMessage}
         </p>
       </div>
     );
@@ -292,64 +315,64 @@ export default function DebriefContent() {
           >
             {error || "No results found."}
           </p>
-          <button
-            onClick={() => router.push("/")}
-            style={{
-              padding: "10px 24px",
-              borderRadius: 8,
-              border: "1px solid var(--border-active)",
-              background: "transparent",
-              color: "var(--text-primary)",
-              fontFamily: "var(--font-body)",
-              cursor: "pointer",
-            }}
-          >
-            Return Home
-          </button>
+          <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+            <button
+              onClick={loadResults}
+              style={{
+                padding: "10px 24px",
+                borderRadius: 8,
+                border: "1px solid var(--border-active)",
+                background: "rgba(108,99,255,0.1)",
+                color: "var(--text-primary)",
+                fontFamily: "var(--font-body)",
+                cursor: "pointer",
+                fontWeight: 600,
+              }}
+            >
+              Retry
+            </button>
+            <button
+              onClick={() => router.push("/")}
+              style={{
+                padding: "10px 24px",
+                borderRadius: 8,
+                border: "1px solid var(--border-subtle)",
+                background: "transparent",
+                color: "var(--text-secondary)",
+                fontFamily: "var(--font-body)",
+                cursor: "pointer",
+              }}
+            >
+              Return Home
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
-  const rawScores = results.radar_scores ?? {
-    communication: 0,
-    clarity: 0,
-    cultural_fit: 0,
-    problem_solving: 0,
-  };
-  // Coerce any null/undefined values returned by the API to 0
-  const radar_scores: RadarScores = {
-    communication: Number(rawScores.communication ?? 0),
-    clarity: Number(rawScores.clarity ?? 0),
-    cultural_fit: Number(rawScores.cultural_fit ?? 0),
-    problem_solving: Number(rawScores.problem_solving ?? 0),
-  };
+  const safeScores = normalizeScores(results);
   const transcript = results.transcript ?? [];
-  // Keep the raw value (string or FeedbackObject) — renderFeedback() handles both shapes.
-  // Using ?? null instead of ?? "" so a missing field renders the "no feedback" fallback.
   const feedback = results.feedback ?? null;
-  const hiring_signal = results.hiring_signal ?? "";
+  const hiringSignal = results.hiring_signal ?? "";
 
-  const radarKeys = Object.keys(radar_scores) as (keyof RadarScores)[];
+  const radarKeys = Object.keys(safeScores) as (keyof RadarScores)[];
   const lowestDim = radarKeys.length
-    ? getLowestDimension(radar_scores)
-    : ("communication" as keyof RadarScores);
-  const avgScore = radarKeys.length ? getAvgScore(radar_scores) : 0;
+    ? getLowestDimension(safeScores)
+    : ("wa_teamwork" as keyof RadarScores);
+  const avgScore = radarKeys.length ? getAvgScore(safeScores) : 0;
   const company = session.getCompany() ?? "";
   const sessionId = session.getSessionId() ?? "";
 
   return (
     <div className="page-light" style={{ minHeight: "100vh", paddingBottom: 120 }}>
-
-      {/* Print-only header (hidden on screen) */}
       <div className="print-header">
-        <h1>MIRU — Interview Report</h1>
+        <h1>MIRU - Interview Report</h1>
         <p>
-          Company: {company || "—"} · Date: {new Date().toLocaleDateString()} · Session: {sessionId.slice(0, 8)}
+          Company: {company || "-"} · Date: {new Date().toLocaleDateString()} · Session: {sessionId.slice(0, 8)}
         </p>
       </div>
 
-      {/* Nav */}
       <nav
         className="no-print dark-surface"
         style={{
@@ -401,14 +424,7 @@ export default function DebriefContent() {
         </div>
       </nav>
 
-      <div
-        style={{
-          maxWidth: 900,
-          margin: "0 auto",
-          padding: "60px 24px 40px",
-        }}
-      >
-        {/* Hero score */}
+      <div style={{ maxWidth: 900, margin: "0 auto", padding: "60px 24px 40px" }}>
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
@@ -469,20 +485,19 @@ export default function DebriefContent() {
           </div>
         </motion.div>
 
-        {/* Section 1 — Score Overview */}
         <section style={{ marginBottom: 80 }}>
           <SectionHeader label="SECTION 01" title="Score Overview" />
 
           <div className="glass-card radar-chart-wrapper" style={{ padding: 32, marginBottom: 28 }}>
-            <MiruRadarChart scores={radar_scores} />
+            <MiruRadarChart scores={safeScores} />
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {(Object.keys(radar_scores) as (keyof RadarScores)[]).map((key, i) => (
+            {(Object.keys(safeScores) as (keyof RadarScores)[]).map((key, i) => (
               <ScoreBar
                 key={key}
                 label={DIMENSION_LABELS[key]}
-                score={radar_scores[key]}
+                score={safeScores[key]}
                 delay={i * 0.05}
                 highlight={key === lowestDim}
               />
@@ -490,17 +505,10 @@ export default function DebriefContent() {
           </div>
         </section>
 
-        {/* Section 2 — HR Feedback */}
         <section style={{ marginBottom: 80 }}>
           <SectionHeader label="SECTION 02" title="Interviewer Feedback" />
 
-          <div
-            className="glass-card"
-            style={{
-              padding: "28px 32px",
-              borderColor: "rgba(245,158,11,0.3)",
-            }}
-          >
+          <div className="glass-card" style={{ padding: "28px 32px", borderColor: "rgba(245,158,11,0.3)" }}>
             <p
               style={{
                 fontSize: 11,
@@ -517,7 +525,6 @@ export default function DebriefContent() {
           </div>
         </section>
 
-        {/* Section 3 — Transcript */}
         {transcript && transcript.length > 0 && (
           <section style={{ marginBottom: 80 }}>
             <SectionHeader label="SECTION 03" title="Interview Transcript" />
@@ -604,28 +611,12 @@ export default function DebriefContent() {
           </section>
         )}
 
-        {/* Section 4 — Hiring Signal */}
         <section style={{ marginBottom: 80 }}>
           <SectionHeader label="SECTION 04" title="Hiring Signal" />
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1.1fr",
-              gap: 28,
-              alignItems: "start",
-            }}
-          >
-            {/* LEFT — compact radar + overall score */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1.1fr", gap: 28, alignItems: "start" }}>
             <div>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  marginBottom: 20,
-                }}
-              >
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
                 <div
                   style={{
                     display: "inline-flex",
@@ -670,24 +661,16 @@ export default function DebriefContent() {
                 </span>
               </div>
 
-              {/* Compact radar */}
               <div
                 className="glass-card radar-chart-wrapper"
                 style={{ padding: "16px 16px 8px", marginBottom: 20, height: 280, overflow: "hidden" }}
               >
-                <MiruRadarChart scores={radar_scores} />
+                <MiruRadarChart scores={safeScores} />
               </div>
             </div>
 
-            {/* RIGHT — hiring signal */}
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <div
-                className="glass-card"
-                style={{
-                  padding: "20px 22px",
-                  borderColor: "rgba(108,99,255,0.2)",
-                }}
-              >
+              <div className="glass-card" style={{ padding: "20px 22px", borderColor: "rgba(108,99,255,0.2)" }}>
                 <p
                   style={{
                     fontSize: 10,
@@ -708,16 +691,14 @@ export default function DebriefContent() {
                     lineHeight: 1.7,
                   }}
                 >
-                  {hiring_signal || "Assessment pending."}
+                  {hiringSignal || "Assessment pending."}
                 </p>
               </div>
 
               {company && (
                 <div className="insight-card">
                   <span className="insight-label">{company.toUpperCase()} INTERVIEW</span>
-                  <p className="insight-body">
-                    Session ID: {sessionId.slice(0, 8)}
-                  </p>
+                  <p className="insight-body">Session ID: {sessionId.slice(0, 8)}</p>
                 </div>
               )}
             </div>
@@ -725,7 +706,6 @@ export default function DebriefContent() {
         </section>
       </div>
 
-      {/* Fixed bottom-right PDF download FAB */}
       <div
         className="no-print"
         style={{
@@ -756,7 +736,7 @@ export default function DebriefContent() {
             letterSpacing: "0.02em",
           }}
         >
-          ↓ Download Report
+          Download Report
         </motion.button>
         <motion.button
           onClick={handlePracticeAgain}

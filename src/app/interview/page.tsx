@@ -14,13 +14,10 @@ import {
   type SpeechRecognitionInstance,
 } from "@/lib/voice";
 import {
-  buildResults,
-  mapInterviewScoresToRadar,
-  scoreAnswer,
   type InterviewScores,
-  type RadarScores,
-  type TranscriptHistoryItem,
 } from "@/lib/types";
+import { normalizeScores } from "@/lib/resultsNormalizer";
+import { DIMENSION_LABELS } from "@/lib/types";
 import ErrorBoundary from "@/components/ErrorBoundary";
 
 type MachineStatus =
@@ -169,10 +166,6 @@ function InterviewPage() {
   const [timerMaxSecs, setTimerMaxSecs] = useState(0);
   const [durationId, setDurationId] = useState("");
 
-  const askedQuestionsRef = useRef<string[]>([]);
-  const answersRef = useRef<string[]>([]);
-  const turnScoresRef = useRef<RadarScores[]>([]);
-  const transcriptHistoryRef = useRef<TranscriptHistoryItem[]>([]);
   const currentQuestionIdRef = useRef<string>("");
   const currentQuestionTextRef = useRef<string>("");
 
@@ -251,41 +244,9 @@ function InterviewPage() {
       timerRef.current = null;
     }
 
-    if (!askedQuestionsRef.current.length && machine.messages.length) {
-      askedQuestionsRef.current = machine.messages
-        .filter((m) => m.role === "agent")
-        .map((m) => m.text);
-    }
-
-    if (askedQuestionsRef.current.length > answersRef.current.length) {
-      const missing = askedQuestionsRef.current.length - answersRef.current.length;
-      for (let i = 0; i < missing; i++) {
-        answersRef.current.push("[No speech detected]");
-      }
-    }
-
-    if (!turnScoresRef.current.length && answersRef.current.length) {
-      turnScoresRef.current = answersRef.current.map((a) => scoreAnswer(a));
-    }
-
-    const results = buildResults(
-      askedQuestionsRef.current.length
-        ? askedQuestionsRef.current
-        : ["Interview"],
-      answersRef.current.length
-        ? answersRef.current
-        : ["[No speech detected]"],
-      turnScoresRef.current.length
-        ? turnScoresRef.current
-        : [scoreAnswer("[No speech detected]")],
-      machine.company,
-      session.getCandidateName() ?? ""
-    );
-
-    session.setResults(results);
     session.setInterviewComplete(true);
     dispatch({ type: "COMPLETED" });
-  }, [machine.messages, machine.company]);
+  }, []);
 
   const executeStartTurn = useCallback(async () => {
     if (requestInFlightRef.current || startedRef.current || interviewCompleteRef.current || !machine.sessionId) {
@@ -327,8 +288,6 @@ function InterviewPage() {
       const nextQuestion = res.next_question?.trim() || "Please introduce yourself.";
       currentQuestionIdRef.current = res.question_id ?? "q1";
       currentQuestionTextRef.current = nextQuestion;
-      askedQuestionsRef.current = [nextQuestion];
-
       if (agentReply) {
         dispatch({ type: "APPEND_MESSAGE", role: "agent", text: agentReply });
         await sleep(400);
@@ -379,16 +338,6 @@ function InterviewPage() {
 
       dispatch({ type: "WAITING_RESPONSE", userText: safeAnswer, appendUser });
 
-      if (appendUser) {
-        answersRef.current.push(safeAnswer);
-        // Append to transcript history for next request
-        transcriptHistoryRef.current.push({
-          question_id: currentQuestionIdRef.current,
-          question: currentQuestionTextRef.current,
-          user_answer: safeAnswer,
-        });
-      }
-
       const ttsLang = machine.languageMode === "jp" ? "ja-JP" : "en-US";
 
       try {
@@ -408,17 +357,6 @@ function InterviewPage() {
           if (res.interviewer_response) {
             dispatch({ type: "APPEND_MESSAGE", role: "agent", text: res.interviewer_response.trim() });
           }
-          const finalScores = turnScoresRef.current.length
-            ? turnScoresRef.current
-            : [scoreAnswer(safeAnswer)];
-          const results = buildResults(
-            askedQuestionsRef.current.length ? askedQuestionsRef.current : ["Interview"],
-            answersRef.current.length ? answersRef.current : [safeAnswer],
-            finalScores,
-            machine.company,
-            session.getCandidateName() ?? ""
-          );
-          session.setResults(results);
           session.setInterviewComplete(true);
           dispatch({ type: "COMPLETED" });
           setTimeout(() => {
@@ -431,17 +369,8 @@ function InterviewPage() {
         const nextQuestion = res.next_question?.trim() || "Please continue.";
 
         // Update current question tracking for the next turn
-        currentQuestionIdRef.current = res.question_id ?? `q${askedQuestionsRef.current.length + 1}`;
+        currentQuestionIdRef.current = res.question_id ?? `q${machine.turnCount + 1}`;
         currentQuestionTextRef.current = nextQuestion;
-        askedQuestionsRef.current.push(nextQuestion);
-
-        const mappedScores = res.scores
-          ? mapInterviewScoresToRadar(res.scores)
-          : scoreAnswer(safeAnswer);
-        if (appendUser) {
-          turnScoresRef.current.push(mappedScores);
-        }
-
         // Show interviewer_response first, then next_question
         if (agentReply) {
           dispatch({ type: "APPEND_MESSAGE", role: "agent", text: agentReply });
@@ -658,6 +587,10 @@ function InterviewPage() {
       ? "MIRU is thinking..."
       : "Tap mic and speak";
 
+  const normalizedLatestScores = machine.latestScores
+    ? normalizeScores({ scores: machine.latestScores })
+    : null;
+
   return (
     <div
       className="page-dark"
@@ -862,7 +795,7 @@ function InterviewPage() {
           </div>
         )}
 
-        {machine.latestScores && (
+        {normalizedLatestScores && (
           <div
             className="glass-card"
             style={{
@@ -878,10 +811,11 @@ function InterviewPage() {
               color: "#c8c9e6",
             }}
           >
-            <div>Communication: {Number(machine.latestScores.communication ?? 0).toFixed(1)}</div>
-            <div>Clarity: {Number(machine.latestScores.clarity ?? 0).toFixed(1)}</div>
-            <div>Cultural Fit: {Number(machine.latestScores.cultural_fit ?? 0).toFixed(1)}</div>
-            <div>Problem Solving: {Number(machine.latestScores.problem_solving ?? 0).toFixed(1)}</div>
+            <div>{DIMENSION_LABELS.wa_teamwork}: {normalizedLatestScores.wa_teamwork.toFixed(1)}</div>
+            <div>{DIMENSION_LABELS.loyalty_commitment}: {normalizedLatestScores.loyalty_commitment.toFixed(1)}</div>
+            <div>{DIMENSION_LABELS.humility}: {normalizedLatestScores.humility.toFixed(1)}</div>
+            <div>{DIMENSION_LABELS.kaizen_growth}: {normalizedLatestScores.kaizen_growth.toFixed(1)}</div>
+            <div>{DIMENSION_LABELS.cultural_fit}: {normalizedLatestScores.cultural_fit.toFixed(1)}</div>
           </div>
         )}
 
