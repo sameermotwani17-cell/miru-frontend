@@ -27,52 +27,11 @@ type CoachingTurn = {
   better_example: string;
 };
 
-const MAX_ATTEMPTS = 8;
-const INTERVAL_MS = 2000;
-
 function isReadyResponse(data: DebriefApiResponse | null): boolean {
   if (!data) return false;
 
   const status = typeof data.status === "string" ? data.status.toLowerCase() : "";
   return status === "ready" || (Array.isArray(data.turn_feedback) && data.turn_feedback.length > 0);
-}
-
-function isNotReadyResponse(data: DebriefApiResponse | null): boolean {
-  if (!data) return false;
-
-  const status = typeof data.status === "string" ? data.status.toLowerCase() : "";
-  return status === "results_not_ready";
-}
-
-async function pollForResults(
-  sessionId: string,
-  onAttempt: (attempt: number, maxAttempts: number) => void
-): Promise<DebriefApiResponse> {
-  for (let i = 0; i < MAX_ATTEMPTS; i++) {
-    const attempt = i + 1;
-    onAttempt(attempt, MAX_ATTEMPTS);
-
-    const res = await fetch(
-      `/api/interview/results?session_id=${encodeURIComponent(sessionId)}`
-    ).catch(() => null);
-
-    const data = res
-      ? ((await res.json().catch(() => null)) as DebriefApiResponse | null)
-      : null;
-
-    if (data && isReadyResponse(data)) {
-      return data;
-    }
-
-    if (isNotReadyResponse(data)) {
-      await new Promise((resolve) => setTimeout(resolve, INTERVAL_MS));
-      continue;
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, INTERVAL_MS));
-  }
-
-  throw new Error("Debrief generation timeout");
 }
 
 function SectionHeader({ label, title }: { label: string; title: string }) {
@@ -289,7 +248,7 @@ export default function DebriefContent() {
   const loadResults = useCallback(async () => {
     setLoading(true);
     setError("");
-    setLoadingMessage(`MIRU is analyzing your interview... Attempt 1 / ${MAX_ATTEMPTS}`);
+    setLoadingMessage("Analyzing interview results...");
 
     const id = getSessionId();
     if (!id) {
@@ -300,22 +259,35 @@ export default function DebriefContent() {
 
     session.setSessionId(id);
 
+    console.log("Fetching results for session:", id);
+
     try {
-      const raw = await pollForResults(id, (attempt, maxAttempts) => {
-        setLoadingMessage(`MIRU is analyzing your interview... Attempt ${attempt} / ${maxAttempts}`);
-      });
+      const res = await fetch(
+        `/api/interview/results?session_id=${encodeURIComponent(id)}`
+      ).catch(() => null);
+
+      const data = res
+        ? ((await res.json().catch(() => null)) as DebriefApiResponse | null)
+        : null;
+
+      console.log("Results received:", data);
+
+      if (!data || !isReadyResponse(data)) {
+        setError("Unable to load interview results.");
+        return;
+      }
 
       const normalized: FullResults = {
-        radar_scores: normalizeScores(raw),
-        transcript: Array.isArray(raw.transcript) ? raw.transcript : [],
-        feedback: raw.feedback ?? "",
-        hiring_signal: raw.hiring_signal ?? "",
+        radar_scores: normalizeScores(data),
+        transcript: Array.isArray(data.transcript) ? data.transcript : [],
+        feedback: data.feedback ?? "",
+        hiring_signal: data.hiring_signal ?? "",
       };
 
       setResults(normalized);
-      setCoachingTurns(normalizeCoachingTurns(raw));
+      setCoachingTurns(normalizeCoachingTurns(data));
     } catch {
-      setError("Debrief generation took longer than expected.");
+      setError("Unable to load interview results.");
     } finally {
       setLoading(false);
     }
