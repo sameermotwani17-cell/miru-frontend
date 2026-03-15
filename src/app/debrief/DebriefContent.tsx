@@ -22,10 +22,9 @@ type CoachingTurn = {
   questionId: string;
   question: string;
   answer: string;
-  userAnswer: string;
   score: number;
   feedback: string;
-  betterExample: string;
+  better_example: string;
 };
 
 const MAX_ATTEMPTS = 8;
@@ -160,10 +159,9 @@ function normalizeCoachingTurns(raw: DebriefApiResponse): CoachingTurn[] {
         questionId: String(turn.question_id ?? `q${index + 1}`),
         question: String(turn.question ?? turn.prompt ?? turn.question_text ?? ""),
         answer: String(turn.answer ?? turn.user_answer ?? ""),
-        userAnswer: String(turn.user_answer ?? ""),
         score: Math.max(0, Math.min(10, computedScore || 0)),
         feedback: String(turn.feedback ?? turn.coaching_feedback ?? "No feedback available."),
-        betterExample: String(
+        better_example: String(
           turn.better_example ?? turn.rewrite ?? turn.improved_answer ?? "No coaching example available."
         ),
       };
@@ -176,10 +174,9 @@ function normalizeCoachingTurns(raw: DebriefApiResponse): CoachingTurn[] {
       questionId: String(turn.question_id ?? `q${index + 1}`),
       question: String(turn.question ?? ""),
       answer: String(turn.user_answer ?? ""),
-      userAnswer: String(turn.user_answer ?? ""),
       score: 0,
       feedback: "No feedback available.",
-      betterExample: "No coaching example available.",
+      better_example: "No coaching example available.",
     };
   });
 }
@@ -637,13 +634,9 @@ export default function DebriefContent() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true, margin: "-60px" }}
                   transition={{ duration: 0.5, delay: i * 0.05, ease: [0.16, 1, 0.3, 1] }}
-                  className="glass-card"
+                  className="debrief-card glass-card flex flex-col gap-4"
                   style={{ padding: "24px 24px", borderColor: "rgba(108,99,255,0.2)" }}
                 >
-                  {(() => {
-                    const resolvedAnswer = item.answer || item.userAnswer;
-                    return (
-                      <>
                   <span
                     style={{
                       fontFamily: "var(--font-body)",
@@ -651,143 +644,35 @@ export default function DebriefContent() {
                       color: "var(--text-dim)",
                       letterSpacing: "0.1em",
                       display: "block",
-                      marginBottom: 12,
                     }}
                   >
                     QUESTION {i + 1}
                   </span>
 
-                  <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                    <div>
-                      <h4
-                        style={{
-                          fontFamily: "var(--font-body)",
-                          fontSize: 12,
-                          color: "var(--accent-primary)",
-                          letterSpacing: "0.08em",
-                          marginBottom: 8,
-                        }}
-                      >
-                        Question
-                      </h4>
-                      <p
-                        style={{
-                          fontFamily: "var(--font-display)",
-                          fontSize: 16,
-                          fontWeight: 600,
-                          color: "var(--text-primary)",
-                          lineHeight: 1.5,
-                        }}
-                      >
-                        {item.question}
-                      </p>
-                    </div>
+                  <h3 style={{ fontFamily: "var(--font-body)", fontSize: 16, color: "var(--accent-primary)" }}>Question</h3>
+                  <p style={{ fontFamily: "var(--font-display)", fontSize: 16, color: "var(--text-primary)", lineHeight: 1.5 }}>
+                    {item.question}
+                  </p>
 
-                    <div
-                      style={{
-                        padding: "12px 14px",
-                        borderRadius: 8,
-                        background: "rgba(255,255,255,0.02)",
-                        border: "1px solid var(--border-subtle)",
-                      }}
-                    >
-                      <h4
-                        style={{
-                          fontFamily: "var(--font-body)",
-                          fontSize: 12,
-                          color: "var(--text-dim)",
-                          letterSpacing: "0.08em",
-                          marginBottom: 8,
-                        }}
-                      >
-                        Your Answer
-                      </h4>
-                      <p
-                        style={{
-                          fontFamily: "var(--font-body)",
-                          fontSize: 13,
-                          color: "var(--text-secondary)",
-                          lineHeight: 1.6,
-                        }}
-                      >
-                        {resolvedAnswer ? resolvedAnswer : "No speech detected"}
-                      </p>
-                    </div>
+                  <h4 style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-dim)" }}>Your Answer</h4>
+                  <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.6 }}>
+                    {item.answer || "No speech detected"}
+                  </p>
 
-                    <div>
-                      <h4
-                        style={{
-                          fontFamily: "var(--font-body)",
-                          fontSize: 12,
-                          color: "var(--accent-gold)",
-                          letterSpacing: "0.08em",
-                          marginBottom: 8,
-                        }}
-                      >
-                        Score
-                      </h4>
-                      <p
-                        style={{
-                          fontFamily: "var(--font-display)",
-                          fontSize: 15,
-                          color: "var(--text-primary)",
-                        }}
-                      >
-                        {item.score.toFixed(1)}/10
-                      </p>
-                    </div>
+                  <h4 style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--accent-gold)" }}>Score</h4>
+                  <p className="text-xl font-bold text-yellow-400">{item.score.toFixed(1)}/10</p>
 
-                    <div>
-                      <h4
-                        style={{
-                          fontFamily: "var(--font-body)",
-                          fontSize: 12,
-                          color: "var(--accent-warm)",
-                          letterSpacing: "0.08em",
-                          marginBottom: 8,
-                        }}
-                      >
-                        Feedback
-                      </h4>
-                      <p
-                        style={{
-                          fontFamily: "var(--font-body)",
-                          fontSize: 13,
-                          color: "var(--text-page-body)",
-                          lineHeight: 1.6,
-                        }}
-                      >
-                        {item.feedback}
-                      </p>
-                    </div>
+                  <h4 style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--accent-warm)" }}>Feedback</h4>
+                  <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-page-body)", lineHeight: 1.6 }}>
+                    {item.feedback}
+                  </p>
 
-                    <div>
-                      <h4
-                        style={{
-                          fontFamily: "var(--font-body)",
-                          fontSize: 12,
-                          color: "var(--accent-green)",
-                          letterSpacing: "0.08em",
-                          marginBottom: 8,
-                        }}
-                      >
-                        Better Answer Example
-                      </h4>
-                      <p
-                        style={{
-                          fontFamily: "var(--font-body)",
-                          fontSize: 13,
-                          color: "var(--text-page-body)",
-                          lineHeight: 1.7,
-                        }}
-                      >
-                        {item.betterExample}
-                      </p>
-                    </div>
-                  </div>
-                      </>
-                    );
-                  })()}
+                  <h4 style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--accent-green)" }}>
+                    Better Answer Example
+                  </h4>
+                  <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-page-body)", lineHeight: 1.7 }}>
+                    {item.better_example}
+                  </p>
                 </motion.div>
               ))}
             </div>
