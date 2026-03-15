@@ -7,7 +7,7 @@ import MiruLogo from "@/components/MiruLogo";
 import HRAvatar from "@/components/HRAvatar";
 import VoiceInput from "@/components/VoiceInput";
 import { session } from "@/lib/session";
-import { speak, speakAndWait, stopSpeech } from "@/lib/tts";
+import { speakAndWait, stopSpeech } from "@/lib/tts";
 import { sendInterviewTurn } from "@/lib/api";
 import {
   startSpeechRecognition,
@@ -74,6 +74,8 @@ const initialMachineState: MachineState = {
 
 const RETRY_BASE_DELAY_MS = 450;
 const WRAP_UP_SECONDS = 20;
+// Silence timeout passed to voice recognition (ms)
+const SILENCE_TIMEOUT_MS = 1800;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -178,7 +180,6 @@ function InterviewPage() {
   const currentQuestionTextRef = useRef<string>("");
 
   const transcriptRef = useRef("");
-  const statusRef = useRef<MachineStatus>("IDLE");
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const submitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -196,10 +197,16 @@ function InterviewPage() {
   const restartRecordingAfterSilenceRef = useRef(false);
   const silenceRetriesRef = useRef(0);
   const pendingRequestRef = useRef<{ kind: "start" | "answer"; answer: string } | null>(null);
+  // Synchronous boolean — set true when recording starts, false as soon as onEnd fires.
+  // Avoids the async-useEffect lag of statusRef.
+  const isListeningRef = useRef(false);
 
-  useEffect(() => {
-    statusRef.current = machine.status;
-  }, [machine.status]);
+  // Stable refs that always point to the latest callback versions.
+  // Used inside recognition event closures to avoid stale-closure bugs.
+  const executeAnswerTurnRef = useRef<(answer: string, appendUser: boolean) => Promise<void>>(
+    async () => {}
+  );
+  const startRecordingRef = useRef<() => void>(() => {});
 
   // Scroll to bottom whenever messages change or status changes
   useEffect(() => {
@@ -247,6 +254,7 @@ function InterviewPage() {
 
     completingRef.current = true;
     wrapUpTriggeredRef.current = true;
+    isListeningRef.current = false;
     dispatch({ type: "WRAP_UP" });
     stopSpeech();
 
@@ -365,7 +373,13 @@ function InterviewPage() {
         isFirst: !agentReply,
       });
 
-      speak([agentReply, nextQuestion].filter(Boolean), ttsLang);
+      console.log("VOICE: TTS starting (first question)");
+      await speakAndWait([agentReply, nextQuestion].filter(Boolean), ttsLang);
+      console.log("VOICE: TTS done — auto-starting mic");
+
+      if (!wrapUpTriggeredRef.current && !interviewCompleteRef.current) {
+        startRecordingRef.current();
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to start interview.";
       dispatch({ type: "ERROR", error: msg });
@@ -390,18 +404,13 @@ function InterviewPage() {
 
       const safeAnswer = answer.trim();
       if (!safeAnswer) {
-        console.warn("No speech detected, restarting recording");
+        console.warn("VOICE: empty answer — restarting recording");
         restartRecordingAfterSilenceRef.current = true;
         dispatch({ type: "BACK_TO_QUESTION" });
         return;
       }
 
-      if (requestInFlightRef.current) {
-        console.warn("Request already in flight, ignoring duplicate turn");
-        return;
-      }
-
-      console.log("Submitting interview turn");
+      console.log("VOICE: submitting answer");
       requestInFlightRef.current = true;
       pendingRequestRef.current = { kind: "answer", answer: safeAnswer };
 
@@ -453,11 +462,10 @@ function InterviewPage() {
         const agentReply = res.interviewer_response?.trim() ?? "";
         const nextQuestion = res.next_question?.trim() || "Please continue.";
 
-        console.log("Next question received");
-        // Update current question tracking for the next turn
+        console.log("VOICE: next question received");
         currentQuestionIdRef.current = res.question_id ?? `q${machine.turnCount + 1}`;
         currentQuestionTextRef.current = nextQuestion;
-        // Show interviewer_response first, then next_question
+
         if (agentReply) {
           dispatch({ type: "APPEND_MESSAGE", role: "agent", text: agentReply });
           await sleep(400);
@@ -470,10 +478,16 @@ function InterviewPage() {
           isFirst: false,
         });
 
-        speak([agentReply, nextQuestion].filter(Boolean), ttsLang);
-
         setTranscript("");
         transcriptRef.current = "";
+
+        console.log("VOICE: TTS starting");
+        await speakAndWait([agentReply, nextQuestion].filter(Boolean), ttsLang);
+        console.log("VOICE: TTS done — auto-starting mic");
+
+        if (!wrapUpTriggeredRef.current && !interviewCompleteRef.current) {
+          startRecordingRef.current();
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Temporary network issue. Please try again.";
         dispatch({ type: "ERROR", error: msg });
@@ -481,8 +495,148 @@ function InterviewPage() {
         requestInFlightRef.current = false;
       }
     },
-    [machine.sessionId, machine.status, machine.languageMode, sendTurnWithRetry, router]
+    [machine.sessionId, machine.status, machine.languageMode, machine.turnCount, sendTurnWithRetry, router]
   );
+
+  // Keep stable refs in sync with the latest callback versions.
+  useEffect(() => {
+    executeAnswerTurnRef.current = executeAnswerTurn;
+  }, [executeAnswerTurn]);
+
+  useEffect(() => {
+    if (machine.status === "IDLE" && machine.sessionId) {
+      void executeStartTurn();
+    }
+  }, [machine.status, machine.sessionId, executeStartTurn]);
+
+  useEffect(() => {
+    if (
+      timerMaxSecs > 0 &&
+      timerSeconds <= WRAP_UP_SECONDS &&
+      !wrapUpTriggeredRef.current &&
+      !interviewCompleteRef.current &&
+      machine.status !== "COMPLETED"
+    ) {
+      void finalizeInterview();
+    }
+  }, [timerSeconds, timerMaxSecs, machine.status, finalizeInterview]);
+
+  const startRecording = useCallback(() => {
+    if (machine.status !== "QUESTION" || wrapUpTriggeredRef.current) {
+      return;
+    }
+
+    console.log("VOICE: listening");
+    setTranscript("");
+    transcriptRef.current = "";
+    isListeningRef.current = true;
+    dispatch({ type: "LISTENING" });
+
+    const recognition = startSpeechRecognition(
+      (text) => {
+        setTranscript(text);
+        transcriptRef.current = text;
+      },
+      {
+        lang: machine.languageMode === "jp" ? "ja-JP" : "en-US",
+        silenceTimeoutMs: SILENCE_TIMEOUT_MS,
+        onError: (message) => {
+          // Only surface errors that aren't caused by an expected stop
+          if (isListeningRef.current) {
+            dispatch({ type: "ERROR", error: message });
+          }
+        },
+        onEnd: () => {
+          // Use isListeningRef (synchronous) — avoids the async useEffect lag of statusRef
+          if (!isListeningRef.current) return;
+          isListeningRef.current = false;
+
+          console.log("VOICE: recognition ended");
+
+          if (wrapUpTriggeredRef.current || interviewCompleteRef.current) return;
+
+          const answer = transcriptRef.current.trim();
+          if (!answer) {
+            console.warn("VOICE: no transcript captured — restarting");
+            silenceRetriesRef.current += 1;
+            if (silenceRetriesRef.current > 2) {
+              console.warn("VOICE: silence retry limit reached — returning to question");
+              silenceRetriesRef.current = 0;
+              dispatch({ type: "BACK_TO_QUESTION" });
+              return;
+            }
+            restartRecordingAfterSilenceRef.current = true;
+            dispatch({ type: "BACK_TO_QUESTION" });
+            return;
+          }
+
+          if (requestInFlightRef.current) {
+            console.warn("VOICE: request already in flight — skipping duplicate submission");
+            return;
+          }
+
+          silenceRetriesRef.current = 0;
+          dispatch({ type: "TRANSCRIBING" });
+          // Call via ref so we always invoke the latest closure — no setTimeout needed
+          void executeAnswerTurnRef.current(answer, true);
+        },
+      }
+    );
+
+    if (!recognition) {
+      isListeningRef.current = false;
+      return;
+    }
+
+    recognitionRef.current = recognition;
+  }, [machine.status, machine.languageMode]);
+
+  // Keep startRecordingRef in sync
+  useEffect(() => {
+    startRecordingRef.current = startRecording;
+  }, [startRecording]);
+
+  const stopRecordingFull = useCallback(() => {
+    if (wrapUpTriggeredRef.current) {
+      return;
+    }
+
+    isListeningRef.current = false;
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
+  }, []);
+
+  // Auto-restart recording after a no-speech silence
+  useEffect(() => {
+    if (machine.status === "QUESTION" && restartRecordingAfterSilenceRef.current) {
+      restartRecordingAfterSilenceRef.current = false;
+      const timer = setTimeout(() => startRecording(), 600);
+      return () => clearTimeout(timer);
+    }
+  }, [machine.status, startRecording]);
+
+  const retryFailedRequest = useCallback(() => {
+    if (wrapUpTriggeredRef.current) {
+      return;
+    }
+
+    const pending = pendingRequestRef.current;
+    if (!pending || requestInFlightRef.current) {
+      return;
+    }
+
+    dispatch({ type: "RETRY_FROM_ERROR" });
+
+    if (pending.kind === "start") {
+      startedRef.current = false;
+      void executeStartTurn();
+      return;
+    }
+
+    void executeAnswerTurnRef.current(pending.answer, false);
+  }, [executeStartTurn]);
 
   useEffect(() => {
     let id = session.getSessionId();
@@ -539,124 +693,6 @@ function InterviewPage() {
       }
     };
   }, []);
-
-  useEffect(() => {
-    if (machine.status === "IDLE" && machine.sessionId) {
-      void executeStartTurn();
-    }
-  }, [machine.status, machine.sessionId, executeStartTurn]);
-
-  useEffect(() => {
-    if (
-      timerMaxSecs > 0 &&
-      timerSeconds <= WRAP_UP_SECONDS &&
-      !wrapUpTriggeredRef.current &&
-      !interviewCompleteRef.current &&
-      machine.status !== "COMPLETED"
-    ) {
-      void finalizeInterview();
-    }
-  }, [timerSeconds, timerMaxSecs, machine.status, finalizeInterview]);
-
-  const startRecording = useCallback(() => {
-    if (machine.status !== "QUESTION" || wrapUpTriggeredRef.current) {
-      return;
-    }
-
-    console.log("Recording started");
-    setTranscript("");
-    transcriptRef.current = "";
-    dispatch({ type: "LISTENING" });
-
-    const recognition = startSpeechRecognition(
-      (text) => {
-        setTranscript(text);
-        transcriptRef.current = text;
-      },
-      {
-        lang: machine.languageMode === "jp" ? "ja-JP" : "en-US",
-        silenceTimeoutMs: 4500,
-        onError: (message) => {
-          dispatch({ type: "ERROR", error: message });
-        },
-        onEnd: () => {
-          console.log("Speech ended");
-          if (statusRef.current !== "LISTENING") return;
-
-          const answer = transcriptRef.current.trim();
-          if (!answer) {
-            console.warn("No transcript captured — restarting recording");
-            silenceRetriesRef.current += 1;
-            if (silenceRetriesRef.current > 2) {
-              console.warn("Silence limit reached — returning to question");
-              silenceRetriesRef.current = 0;
-              dispatch({ type: "BACK_TO_QUESTION" });
-              return;
-            }
-            restartRecordingAfterSilenceRef.current = true;
-            dispatch({ type: "BACK_TO_QUESTION" });
-            return;
-          }
-
-          silenceRetriesRef.current = 0;
-          dispatch({ type: "TRANSCRIBING" });
-          if (submitTimeoutRef.current) {
-            clearTimeout(submitTimeoutRef.current);
-          }
-          submitTimeoutRef.current = setTimeout(() => {
-            void executeAnswerTurn(answer, true);
-          }, 220);
-        },
-      }
-    );
-
-    if (!recognition) {
-      return;
-    }
-
-    recognitionRef.current = recognition;
-  }, [machine.status, machine.languageMode, executeAnswerTurn]);
-
-  const stopRecordingFull = useCallback(() => {
-    if (wrapUpTriggeredRef.current) {
-      return;
-    }
-
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-      recognitionRef.current = null;
-    }
-  }, []);
-
-  // Auto-restart recording after a no-speech silence (PATCH 1)
-  useEffect(() => {
-    if (machine.status === "QUESTION" && restartRecordingAfterSilenceRef.current) {
-      restartRecordingAfterSilenceRef.current = false;
-      const timer = setTimeout(() => startRecording(), 600);
-      return () => clearTimeout(timer);
-    }
-  }, [machine.status, startRecording]);
-
-  const retryFailedRequest = useCallback(() => {
-    if (wrapUpTriggeredRef.current) {
-      return;
-    }
-
-    const pending = pendingRequestRef.current;
-    if (!pending || requestInFlightRef.current) {
-      return;
-    }
-
-    dispatch({ type: "RETRY_FROM_ERROR" });
-
-    if (pending.kind === "start") {
-      startedRef.current = false;
-      void executeStartTurn();
-      return;
-    }
-
-    void executeAnswerTurn(pending.answer, false);
-  }, [executeStartTurn, executeAnswerTurn]);
 
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60);

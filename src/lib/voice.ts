@@ -37,9 +37,8 @@ export interface StartSpeechRecognitionOptions {
   onEnd?: () => void;
 }
 
-// How long silence must persist (after the minimum speech duration) before we
-// auto-stop.
-const DEFAULT_SILENCE_TIMEOUT_MS = 3000;
+// Silence must persist for this long before auto-stop.
+const DEFAULT_SILENCE_TIMEOUT_MS = 1800;
 
 // Minimum speech duration before silence can auto-end capture.
 const MIN_SPEECH_DURATION_MS = 800;
@@ -72,36 +71,28 @@ export function startSpeechRecognition(
   const silenceTimeoutMs = options.silenceTimeoutMs ?? DEFAULT_SILENCE_TIMEOUT_MS;
   let silenceTimer: ReturnType<typeof setTimeout> | null = null;
   let hasDetectedSpeech = false;
-  // Timestamp of the first speech result — used to enforce minimum speech window
   let speechStartTime: number | null = null;
 
   const clearSilenceTimer = () => {
-    if (!silenceTimer) {
-      return;
-    }
+    if (!silenceTimer) return;
     clearTimeout(silenceTimer);
     silenceTimer = null;
   };
 
   const resetSilenceTimer = () => {
-    if (!hasDetectedSpeech) {
-      return;
-    }
+    if (!hasDetectedSpeech) return;
     clearSilenceTimer();
 
     const now = Date.now();
     const speechElapsed = speechStartTime !== null ? now - speechStartTime : 0;
 
-    // If we are still inside the minimum speech duration, extend the effective
-    // timeout so it expires no earlier than MIN_SPEECH_DURATION_MS from when
-    // speech first started. This acts as both the minimum window AND the
-    // resume buffer — any new speech resets this same timer.
     const effectiveTimeout =
       speechElapsed < MIN_SPEECH_DURATION_MS
         ? silenceTimeoutMs + (MIN_SPEECH_DURATION_MS - speechElapsed)
         : silenceTimeoutMs;
 
     silenceTimer = setTimeout(() => {
+      console.log("VOICE: silence detected — stopping recognition");
       recognition.stop();
     }, effectiveTimeout);
   };
@@ -110,18 +101,24 @@ export function startSpeechRecognition(
     hasDetectedSpeech = false;
     speechStartTime = null;
     clearSilenceTimer();
+    console.log("VOICE: listening");
   };
 
   recognition.onresult = (event: SpeechRecognitionEventLike) => {
-    const latestResult = event.results[event.results.length - 1];
-    const text = latestResult?.[0]?.transcript?.trim();
-    if (text) {
+    // Accumulate full transcript across ALL result segments (handles multi-part utterances)
+    let fullText = "";
+    for (let i = 0; i < event.results.length; i++) {
+      fullText += event.results[i][0]?.transcript ?? "";
+    }
+    fullText = fullText.trim();
+
+    if (fullText) {
       if (!hasDetectedSpeech) {
         hasDetectedSpeech = true;
         speechStartTime = Date.now();
-        console.log("Speech detected");
+        console.log("VOICE: speech detected");
       }
-      onResult(text);
+      onResult(fullText);
       resetSilenceTimer();
     }
   };
@@ -129,12 +126,14 @@ export function startSpeechRecognition(
   recognition.onerror = (event: SpeechRecognitionErrorEventLike) => {
     clearSilenceTimer();
     if (event.error !== "aborted") {
+      console.warn(`VOICE: recognition error — ${event.error}`);
       options.onError?.(`Recording error: ${event.error}`);
     }
   };
 
   recognition.onend = () => {
     clearSilenceTimer();
+    console.log("VOICE: recognition ended");
     options.onEnd?.();
   };
 
