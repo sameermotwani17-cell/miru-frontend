@@ -55,23 +55,23 @@ export default function MiruRadarChart({ scores }: MiruRadarChartProps) {
           flexWrap: "wrap",
         }}
       >
-        <span style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--text-secondary)" }}>
-          <span style={{ color: "#8884d8", marginRight: 6 }}>●</span>
+        <span style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "#4a6a8a" }}>
+          <span style={{ color: "#0d3a5f", marginRight: 6 }}>●</span>
           Ideal Japanese Candidate
         </span>
-        <span style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--text-secondary)" }}>
-          <span style={{ color: "#00C49F", marginRight: 6 }}>●</span>
+        <span style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "#4a6a8a" }}>
+          <span style={{ color: "#1ca2a2", marginRight: 6 }}>●</span>
           Your Interview Signals
         </span>
       </div>
 
       <ResponsiveContainer width="100%" height={320}>
         <RadarChart data={data} margin={{ top: 20, right: 30, bottom: 20, left: 30 }}>
-          <PolarGrid gridType="polygon" stroke="rgba(108,99,255,0.15)" />
+          <PolarGrid gridType="polygon" stroke="rgba(40,131,186,0.15)" />
           <PolarAngleAxis
             dataKey="dimension"
             tick={{
-              fill: "var(--text-secondary)",
+              fill: "#4a6a8a",
               fontSize: 11,
               fontFamily: "var(--font-body)",
             }}
@@ -85,30 +85,31 @@ export default function MiruRadarChart({ scores }: MiruRadarChartProps) {
             }}
             labelFormatter={(label) => `Dimension: ${String(label ?? "")}`}
             contentStyle={{
-              background: "rgba(13,13,20,0.95)",
-              border: "1px solid var(--border-subtle)",
+              background: "rgba(255,255,255,0.97)",
+              border: "1px solid rgba(40,131,186,0.2)",
               borderRadius: 8,
-              color: "var(--text-primary)",
+              color: "#0d3a5f",
               fontFamily: "var(--font-body)",
+              boxShadow: "0 4px 16px rgba(13,58,95,0.1)",
             }}
           />
           <Radar
             name="Ideal Japanese Candidate"
             dataKey="ideal"
-            stroke="#8884d8"
-            fill="#8884d8"
-            fillOpacity={0.1}
+            stroke="#0d3a5f"
+            fill="#0d3a5f"
+            fillOpacity={0.08}
             dot={false}
           />
           <Radar
             name="Your Interview Signals"
             dataKey="candidate"
-            stroke="#00C49F"
-            fill="#00C49F"
-            fillOpacity={0.55}
+            stroke="#1ca2a2"
+            fill="#1ca2a2"
+            fillOpacity={0.45}
             dot={{
               r: 4,
-              fill: "#00C49F",
+              fill: "#1ca2a2",
               strokeWidth: 0,
             }}
           />

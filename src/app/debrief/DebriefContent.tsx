@@ -388,8 +388,8 @@ export default function DebriefContent() {
             width: 40,
             height: 40,
             borderRadius: "50%",
-            border: "2px solid var(--border-subtle)",
-            borderTopColor: "var(--accent-primary)",
+            border: "2px solid rgba(40,131,186,0.15)",
+            borderTopColor: "#2883ba",
           }}
         />
         <p
@@ -439,9 +439,9 @@ export default function DebriefContent() {
               style={{
                 padding: "10px 24px",
                 borderRadius: 8,
-                border: "1px solid var(--border-active)",
-                background: "rgba(108,99,255,0.1)",
-                color: "var(--text-primary)",
+                border: "none",
+                background: "#2883ba",
+                color: "#ffffff",
                 fontFamily: "var(--font-body)",
                 cursor: "pointer",
                 fontWeight: 600,
@@ -454,9 +454,9 @@ export default function DebriefContent() {
               style={{
                 padding: "10px 24px",
                 borderRadius: 8,
-                border: "1px solid var(--border-subtle)",
+                border: "1px solid rgba(40,131,186,0.2)",
                 background: "transparent",
-                color: "var(--text-secondary)",
+                color: "#4a6a8a",
                 fontFamily: "var(--font-body)",
                 cursor: "pointer",
               }}
@@ -499,13 +499,12 @@ export default function DebriefContent() {
           position: "sticky",
           top: 0,
           zIndex: 50,
-          padding: "16px 32px",
+          padding: "14px 32px",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          borderBottom: "1px solid var(--border-subtle)",
-          background: "rgba(5,5,8,0.85)",
-          backdropFilter: "blur(20px)",
+          borderBottom: "1px solid rgba(13,58,95,0.3)",
+          background: "#0d3a5f",
         }}
       >
         <MiruLogo size="sm" />
@@ -515,9 +514,9 @@ export default function DebriefContent() {
             style={{
               padding: "8px 18px",
               borderRadius: 8,
-              border: "1px solid var(--border-subtle)",
+              border: "1px solid rgba(255,255,255,0.2)",
               background: "transparent",
-              color: "var(--text-secondary)",
+              color: "rgba(255,255,255,0.75)",
               fontFamily: "var(--font-body)",
               fontSize: 13,
               cursor: "pointer",
@@ -530,9 +529,9 @@ export default function DebriefContent() {
             style={{
               padding: "8px 18px",
               borderRadius: 8,
-              border: "1px solid var(--border-active)",
-              background: "rgba(108,99,255,0.1)",
-              color: "var(--text-primary)",
+              border: "none",
+              background: "rgba(255,255,255,0.15)",
+              color: "#ffffff",
               fontFamily: "var(--font-body)",
               fontSize: 13,
               cursor: "pointer",
@@ -670,7 +669,7 @@ export default function DebriefContent() {
                   viewport={{ once: true, margin: "-60px" }}
                   transition={{ duration: 0.5, delay: i * 0.05, ease: [0.16, 1, 0.3, 1] }}
                   className="debrief-card glass-card flex flex-col gap-4"
-                  style={{ padding: "24px 24px", borderColor: "rgba(108,99,255,0.2)" }}
+                  style={{ padding: "24px 24px", borderColor: "rgba(40,131,186,0.2)" }}
                 >
                   <span
                     style={{
@@ -684,8 +683,8 @@ export default function DebriefContent() {
                     QUESTION {i + 1}
                   </span>
 
-                  <h3 style={{ fontFamily: "var(--font-body)", fontSize: 16, color: "var(--accent-primary)" }}>Question</h3>
-                  <p style={{ fontFamily: "var(--font-display)", fontSize: 16, color: "var(--text-primary)", lineHeight: 1.5 }}>
+                  <h3 style={{ fontFamily: "var(--font-body)", fontSize: 16, color: "#0d3a5f", fontWeight: 600 }}>Question</h3>
+                  <p style={{ fontFamily: "var(--font-display)", fontSize: 16, color: "#0d3a5f", lineHeight: 1.5 }}>
                     {item.question}
                   </p>
 
@@ -774,11 +773,11 @@ export default function DebriefContent() {
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <div className="glass-card" style={{ padding: "20px 22px", borderColor: "rgba(108,99,255,0.2)" }}>
+              <div className="glass-card" style={{ padding: "20px 22px", borderColor: "rgba(40,131,186,0.2)" }}>
                 <p
                   style={{
                     fontSize: 10,
-                    color: "var(--accent-primary)",
+                    color: "#2883ba",
                     letterSpacing: "0.1em",
                     fontFamily: "var(--font-body)",
                     fontWeight: 700,
@@ -824,19 +823,19 @@ export default function DebriefContent() {
       >
         <motion.button
           onClick={() => window.print()}
-          whileHover={{ scale: 1.04, boxShadow: "0 0 28px rgba(108,99,255,0.45)" }}
+          whileHover={{ scale: 1.04, boxShadow: "0 0 28px rgba(40,131,186,0.45)" }}
           whileTap={{ scale: 0.97 }}
           style={{
             padding: "13px 22px",
             borderRadius: 12,
-            background: "linear-gradient(135deg, var(--accent-primary), #8B5CF6)",
+            background: "#2883ba",
             border: "none",
             color: "#fff",
             fontFamily: "var(--font-body)",
             fontSize: 14,
             fontWeight: 700,
             cursor: "pointer",
-            boxShadow: "0 4px 24px rgba(108,99,255,0.3)",
+            boxShadow: "0 4px 20px rgba(40,131,186,0.35)",
             letterSpacing: "0.02em",
           }}
         >
@@ -849,14 +848,15 @@ export default function DebriefContent() {
           style={{
             padding: "11px 22px",
             borderRadius: 12,
-            border: "1px solid var(--border-active)",
-            background: "rgba(13,13,20,0.85)",
-            backdropFilter: "blur(12px)",
-            color: "var(--text-secondary)",
+            border: "1px solid rgba(13,58,95,0.2)",
+            background: "rgba(255,255,255,0.92)",
+            backdropFilter: "blur(8px)",
+            color: "#0d3a5f",
             fontFamily: "var(--font-body)",
             fontSize: 13,
             fontWeight: 600,
             cursor: "pointer",
+            boxShadow: "0 2px 12px rgba(13,58,95,0.1)",
           }}
         >
           Start Again

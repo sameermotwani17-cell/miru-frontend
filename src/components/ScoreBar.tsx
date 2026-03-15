@@ -30,9 +30,10 @@ export default function ScoreBar({
         padding: "14px 18px",
         borderRadius: 10,
         background: highlight
-          ? "rgba(255,107,107,0.05)"
-          : "rgba(13,13,20,0.5)",
-        border: `1px solid ${highlight ? "rgba(255,107,107,0.2)" : "var(--border-subtle)"}`,
+          ? "rgba(239,68,68,0.04)"
+          : "rgba(255,255,255,0.8)",
+        border: `1px solid ${highlight ? "rgba(239,68,68,0.2)" : "rgba(40,131,186,0.14)"}`,
+        boxShadow: "0 1px 6px rgba(13,58,95,0.05)",
       }}
     >
       <div
@@ -47,7 +48,7 @@ export default function ScoreBar({
           style={{
             fontFamily: "var(--font-body)",
             fontSize: 13,
-            color: highlight ? "var(--accent-warm)" : "var(--text-secondary)",
+            color: highlight ? "var(--accent-warm)" : "#4a6a8a",
             fontWeight: highlight ? 600 : 400,
           }}
         >

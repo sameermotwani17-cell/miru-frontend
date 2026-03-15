@@ -67,13 +67,12 @@ export default function LandingPage() {
           left: 0,
           right: 0,
           zIndex: 50,
-          padding: "20px 40px",
+          padding: "16px 40px",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          borderBottom: "1px solid rgba(108,99,255,0.08)",
-          background: "rgba(5,5,8,0.7)",
-          backdropFilter: "blur(20px)",
+          borderBottom: "1px solid rgba(13,58,95,0.25)",
+          background: "#0d3a5f",
         }}
       >
         <MiruLogo size="sm" animated />
@@ -84,13 +83,14 @@ export default function LandingPage() {
             style={{
               padding: "8px 22px",
               borderRadius: 8,
-              border: "1px solid var(--border-active)",
-              background: "transparent",
-              color: "var(--text-primary)",
+              border: "1px solid rgba(255,255,255,0.3)",
+              background: "rgba(255,255,255,0.1)",
+              color: "#ffffff",
               fontFamily: "var(--font-body)",
               fontSize: 14,
               cursor: "pointer",
               letterSpacing: "0.06em",
+              fontWeight: 600,
             }}
           >
             Start Interview
@@ -118,13 +118,13 @@ export default function LandingPage() {
                 display: "inline-block",
                 padding: "6px 16px",
                 borderRadius: 999,
-                border: "1px solid rgba(108,99,255,0.25)",
-                color: "var(--text-page-accent)",
+                border: "1px solid rgba(40,131,186,0.3)",
+                color: "#2883ba",
                 fontSize: 12,
                 letterSpacing: "0.12em",
                 fontFamily: "var(--font-body)",
                 marginBottom: 32,
-                background: "rgba(108,99,255,0.07)",
+                background: "rgba(40,131,186,0.08)",
               }}
             >
               <span style={{ fontFamily: "var(--font-japanese)" }}>
@@ -151,8 +151,7 @@ export default function LandingPage() {
             The AI that thinks like a{" "}
             <span
               style={{
-                background:
-                  "linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))",
+                background: "linear-gradient(135deg, #0d3a5f, #2883ba)",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
               }}
@@ -185,13 +184,12 @@ export default function LandingPage() {
           <motion.div variants={item}>
             <Link href="/onboarding">
               <motion.button
-                whileHover={{ scale: 1.04, boxShadow: "var(--glow-primary)" }}
+                whileHover={{ scale: 1.04, boxShadow: "0 0 32px rgba(40,131,186,0.4)" }}
                 whileTap={{ scale: 0.96 }}
                 style={{
                   padding: "16px 40px",
                   borderRadius: 12,
-                  background:
-                    "linear-gradient(135deg, var(--accent-primary), #8B5CF6)",
+                  background: "#2883ba",
                   border: "none",
                   color: "#fff",
                   fontFamily: "var(--font-body)",
@@ -199,6 +197,7 @@ export default function LandingPage() {
                   fontWeight: 600,
                   cursor: "pointer",
                   letterSpacing: "0.04em",
+                  boxShadow: "0 4px 20px rgba(40,131,186,0.3)",
                 }}
               >
                 Start Your Interview →
@@ -317,22 +316,23 @@ export default function LandingPage() {
             <motion.div
               key={c.name}
               variants={item}
-              className="dark-surface"
               style={{
-                padding: "12px 28px",
+                padding: "10px 24px",
                 borderRadius: 8,
-                border: "1px solid var(--border-subtle)",
-                background: "rgba(13,13,20,0.6)",
+                border: "1px solid rgba(13,58,95,0.14)",
+                background: "rgba(255,255,255,0.75)",
+                backdropFilter: "blur(4px)",
                 display: "flex",
                 alignItems: "center",
                 gap: 8,
+                boxShadow: "0 1px 6px rgba(13,58,95,0.06)",
               }}
             >
               <span
                 style={{
                   fontFamily: "var(--font-japanese)",
                   fontSize: 12,
-                  color: "var(--text-secondary)",
+                  color: "#1ca2a2",
                 }}
               >
                 {c.jp}
@@ -342,7 +342,7 @@ export default function LandingPage() {
                   fontFamily: "var(--font-body)",
                   fontSize: 14,
                   fontWeight: 600,
-                  color: "var(--text-primary)",
+                  color: "#0d3a5f",
                 }}
               >
                 {c.name}
@@ -357,7 +357,7 @@ export default function LandingPage() {
         style={{
           padding: "80px 24px",
           textAlign: "center",
-          borderTop: "1px solid var(--border-subtle)",
+          borderTop: "1px solid rgba(13,58,95,0.1)",
         }}
       >
         <motion.div
@@ -370,7 +370,7 @@ export default function LandingPage() {
             style={{
               fontFamily: "var(--font-japanese)",
               fontSize: 14,
-              color: "var(--text-page-accent)",
+              color: "#1ca2a2",
               marginBottom: 16,
             }}
           >
@@ -380,7 +380,7 @@ export default function LandingPage() {
             style={{
               fontFamily: "var(--font-body)",
               fontSize: 16,
-              color: "var(--text-page-body)",
+              color: "#333333",
               marginBottom: 32,
             }}
           >
@@ -388,18 +388,19 @@ export default function LandingPage() {
           </p>
           <Link href="/onboarding">
             <motion.button
-              whileHover={{ scale: 1.04 }}
+              whileHover={{ scale: 1.04, boxShadow: "0 0 24px rgba(40,131,186,0.25)" }}
               whileTap={{ scale: 0.96 }}
               style={{
                 padding: "14px 36px",
                 borderRadius: 10,
-                border: "1px solid var(--border-active)",
-                background: "rgba(108,99,255,0.12)",
-                color: "var(--text-page-heading)",
+                border: "none",
+                background: "#0d3a5f",
+                color: "#ffffff",
                 fontFamily: "var(--font-body)",
                 fontSize: 15,
                 fontWeight: 700,
                 cursor: "pointer",
+                boxShadow: "0 4px 16px rgba(13,58,95,0.2)",
               }}
             >
               Begin Interview →

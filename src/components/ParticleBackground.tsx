@@ -12,23 +12,23 @@ interface Particle {
   opacity: number;
 }
 
-// Light theme — subtle on white canvas
+// Light theme — subtle on warm canvas
 const LIGHT_COLORS = [
-  "108, 99, 255",  // indigo
-  "0, 212, 255",   // cyan
-  "200, 200, 232", // lavender
-  "5, 5, 8",       // near-black
+  "40, 131, 186",   // secondary blue
+  "28, 162, 162",   // accent teal
+  "13, 58, 95",     // primary dark blue
+  "100, 160, 205",  // soft blue
 ];
 
 // Dark theme — visible on void canvas
 const DARK_COLORS = [
-  "108, 99, 255",  // indigo
-  "0, 212, 255",   // ice blue
-  "180, 170, 255", // soft indigo
-  "0, 180, 220",   // teal
+  "40, 131, 186",   // secondary blue
+  "28, 162, 162",   // accent teal
+  "13, 58, 95",     // primary dark (subtle)
+  "0, 180, 220",    // cyan
 ];
 
-const LIGHT_BG = "#F8F8FC";
+const LIGHT_BG = "#faf0e0";
 const DARK_BG  = "#050508";
 const PARTICLE_COUNT = 120;
 
@@ -43,22 +43,22 @@ interface BokehBlob {
 }
 
 const BOKEH_BLOBS: BokehBlob[] = [
-  { color: "rgba(108, 99, 255, 0.06)", size: 380, top: "5%",  left: "10%", duration: 28, delay: 0,   animation: "bokeh-drift-1" },
-  { color: "rgba(0, 212, 255, 0.05)",  size: 320, top: "60%", left: "75%", duration: 34, delay: -8,  animation: "bokeh-drift-2" },
-  { color: "rgba(200, 200, 232, 0.07)",size: 420, top: "30%", left: "55%", duration: 40, delay: -14, animation: "bokeh-drift-3" },
-  { color: "rgba(108, 99, 255, 0.04)", size: 280, top: "75%", left: "20%", duration: 24, delay: -5,  animation: "bokeh-drift-4" },
-  { color: "rgba(0, 212, 255, 0.04)",  size: 350, top: "15%", left: "80%", duration: 38, delay: -20, animation: "bokeh-drift-5" },
-  { color: "rgba(200, 200, 232, 0.06)",size: 300, top: "50%", left: "5%",  duration: 30, delay: -10, animation: "bokeh-drift-6" },
+  { color: "rgba(40, 131, 186, 0.07)", size: 380, top: "5%",  left: "10%", duration: 28, delay: 0,   animation: "bokeh-drift-1" },
+  { color: "rgba(28, 162, 162, 0.06)", size: 320, top: "60%", left: "75%", duration: 34, delay: -8,  animation: "bokeh-drift-2" },
+  { color: "rgba(13, 58, 95, 0.05)",   size: 420, top: "30%", left: "55%", duration: 40, delay: -14, animation: "bokeh-drift-3" },
+  { color: "rgba(40, 131, 186, 0.05)", size: 280, top: "75%", left: "20%", duration: 24, delay: -5,  animation: "bokeh-drift-4" },
+  { color: "rgba(28, 162, 162, 0.04)", size: 350, top: "15%", left: "80%", duration: 38, delay: -20, animation: "bokeh-drift-5" },
+  { color: "rgba(13, 58, 95, 0.04)",   size: 300, top: "50%", left: "5%",  duration: 30, delay: -10, animation: "bokeh-drift-6" },
 ];
 
 // Dark bokeh — more saturated, visible against void
 const DARK_BOKEH_BLOBS: BokehBlob[] = [
-  { color: "rgba(108, 99, 255, 0.12)", size: 400, top: "5%",  left: "10%", duration: 28, delay: 0,   animation: "bokeh-drift-1" },
-  { color: "rgba(0, 212, 255, 0.10)",  size: 340, top: "60%", left: "75%", duration: 34, delay: -8,  animation: "bokeh-drift-2" },
-  { color: "rgba(108, 99, 255, 0.08)", size: 460, top: "30%", left: "55%", duration: 40, delay: -14, animation: "bokeh-drift-3" },
-  { color: "rgba(0, 212, 255, 0.07)",  size: 300, top: "75%", left: "20%", duration: 24, delay: -5,  animation: "bokeh-drift-4" },
-  { color: "rgba(108, 99, 255, 0.09)", size: 380, top: "15%", left: "80%", duration: 38, delay: -20, animation: "bokeh-drift-5" },
-  { color: "rgba(0, 212, 255, 0.06)",  size: 320, top: "50%", left: "5%",  duration: 30, delay: -10, animation: "bokeh-drift-6" },
+  { color: "rgba(40, 131, 186, 0.14)", size: 400, top: "5%",  left: "10%", duration: 28, delay: 0,   animation: "bokeh-drift-1" },
+  { color: "rgba(28, 162, 162, 0.11)", size: 340, top: "60%", left: "75%", duration: 34, delay: -8,  animation: "bokeh-drift-2" },
+  { color: "rgba(40, 131, 186, 0.09)", size: 460, top: "30%", left: "55%", duration: 40, delay: -14, animation: "bokeh-drift-3" },
+  { color: "rgba(28, 162, 162, 0.08)", size: 300, top: "75%", left: "20%", duration: 24, delay: -5,  animation: "bokeh-drift-4" },
+  { color: "rgba(40, 131, 186, 0.10)", size: 380, top: "15%", left: "80%", duration: 38, delay: -20, animation: "bokeh-drift-5" },
+  { color: "rgba(28, 162, 162, 0.07)", size: 320, top: "50%", left: "5%",  duration: 30, delay: -10, animation: "bokeh-drift-6" },
 ];
 
 interface ParticleBackgroundProps {

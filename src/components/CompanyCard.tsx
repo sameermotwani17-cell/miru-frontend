@@ -45,9 +45,11 @@ export default function CompanyCard({
         borderRadius: 14,
         border: selected
           ? `1.5px solid ${accent}`
-          : "1px solid var(--border-subtle)",
-        background: selected ? bg : "rgba(13,13,20,0.6)",
-        boxShadow: selected ? `0 0 24px ${accent}40` : "none",
+          : "1px solid rgba(40,131,186,0.15)",
+        background: selected ? bg : "#ffffff",
+        boxShadow: selected
+          ? `0 0 20px ${accent}30`
+          : "0 1px 8px rgba(13,58,95,0.06)",
         cursor: "pointer",
         textAlign: "left",
         transition: "border-color 0.2s, box-shadow 0.2s, background 0.2s",
@@ -60,8 +62,8 @@ export default function CompanyCard({
           width: 44,
           height: 44,
           borderRadius: 10,
-          background: selected ? `${accent}25` : "rgba(255,255,255,0.04)",
-          border: `1px solid ${selected ? accent : "rgba(255,255,255,0.08)"}`,
+          background: selected ? `${accent}20` : "rgba(40,131,186,0.06)",
+          border: `1px solid ${selected ? accent : "rgba(40,131,186,0.12)"}`,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -69,7 +71,7 @@ export default function CompanyCard({
           overflow: "hidden",
           fontSize: 18,
           fontFamily: "var(--font-japanese)",
-          color: selected ? accent : "var(--text-secondary)",
+          color: selected ? accent : "#4a6a8a",
           fontWeight: 700,
           transition: "all 0.2s",
         }}
@@ -95,7 +97,7 @@ export default function CompanyCard({
             fontFamily: "var(--font-display)",
             fontSize: 16,
             fontWeight: 700,
-            color: selected ? "var(--text-primary)" : "var(--text-primary)",
+            color: "#0d3a5f",
           }}
         >
           {name}
@@ -117,7 +119,7 @@ export default function CompanyCard({
         style={{
           fontFamily: "var(--font-body)",
           fontSize: 12,
-          color: selected ? "var(--text-secondary)" : "var(--text-dim)",
+          color: selected ? "#4a6a8a" : "#8899aa",
           lineHeight: 1.4,
           transition: "color 0.2s",
         }}

@@ -78,17 +78,17 @@ const DURATION_OPTIONS: DurationOption[] = [
 
 const BADGE_STYLES: Record<"amber" | "indigo" | "red", React.CSSProperties> = {
   amber: {
-    background: "rgba(255,179,71,0.15)",
-    border: "1px solid rgba(255,179,71,0.35)",
-    color: "#ffb347",
+    background: "rgba(245,158,11,0.12)",
+    border: "1px solid rgba(245,158,11,0.35)",
+    color: "#d97706",
   },
   indigo: {
-    background: "rgba(108,99,255,0.15)",
-    border: "1px solid rgba(108,99,255,0.35)",
-    color: "#6c63ff",
+    background: "rgba(40,131,186,0.12)",
+    border: "1px solid rgba(40,131,186,0.35)",
+    color: "#2883ba",
   },
   red: {
-    background: "rgba(239,68,68,0.15)",
+    background: "rgba(239,68,68,0.12)",
     border: "1px solid rgba(239,68,68,0.35)",
     color: "#ef4444",
   },
@@ -214,18 +214,18 @@ export default function OnboardingPage() {
                   fontFamily: "var(--font-body)",
                   fontWeight: 600,
                   border: s <= step
-                    ? "1px solid var(--accent-primary)"
-                    : "1px solid var(--border-subtle)",
+                    ? "1px solid #2883ba"
+                    : "1px solid rgba(40,131,186,0.2)",
                   background: s < step
-                    ? "var(--accent-primary)"
+                    ? "#2883ba"
                     : s === step
-                    ? "rgba(108,99,255,0.15)"
+                    ? "rgba(40,131,186,0.1)"
                     : "transparent",
                   color: s < step
                     ? "#fff"
                     : s === step
-                    ? "var(--accent-primary)"
-                    : "var(--text-dim)",
+                    ? "#2883ba"
+                    : "#8899aa",
                   transition: "all 0.3s",
                 }}
               >
@@ -237,8 +237,8 @@ export default function OnboardingPage() {
                     width: 32,
                     height: 1,
                     background: s < step
-                      ? "var(--accent-primary)"
-                      : "var(--border-subtle)",
+                      ? "#2883ba"
+                      : "rgba(40,131,186,0.2)",
                     transition: "background 0.3s",
                   }}
                 />
@@ -260,8 +260,9 @@ export default function OnboardingPage() {
                   style={{
                     position: "absolute",
                     top: 0, left: 0, right: 0,
-                    height: 2,
-                    background: "linear-gradient(90deg, var(--accent-primary), #8B5CF6)",
+                    height: 3,
+                    background: "linear-gradient(90deg, #0d3a5f, #2883ba)",
+                    borderRadius: "12px 12px 0 0",
                   }}
                 />
 
@@ -301,8 +302,9 @@ export default function OnboardingPage() {
                   style={{
                     position: "absolute",
                     top: 0, left: 0, right: 0,
-                    height: 2,
-                    background: "linear-gradient(90deg, var(--accent-primary), #8B5CF6)",
+                    height: 3,
+                    background: "linear-gradient(90deg, #0d3a5f, #2883ba)",
+                    borderRadius: "12px 12px 0 0",
                   }}
                 />
 
@@ -350,10 +352,10 @@ export default function OnboardingPage() {
                   style={{
                     position: "absolute",
                     top: 0, left: 0, right: 0,
-                    height: 2,
+                    height: 3,
                     background: selectedCompanyData
                       ? `linear-gradient(90deg, ${selectedCompanyData.accent}, ${selectedCompanyData.accent}80)`
-                      : "linear-gradient(90deg, var(--accent-primary), #8B5CF6)",
+                      : "linear-gradient(90deg, #0d3a5f, #2883ba)",
                   }}
                 />
 
@@ -418,14 +420,14 @@ export default function OnboardingPage() {
                           padding: "13px 16px",
                           borderRadius: 10,
                           border: cvFileName
-                            ? `1px solid ${selectedCompanyData?.accent ?? "var(--accent-primary)"}60`
-                            : "1px dashed var(--border-subtle)",
+                            ? `1px solid ${selectedCompanyData?.accent ?? "#2883ba"}60`
+                            : "1px dashed rgba(40,131,186,0.3)",
                           background: cvFileName
-                            ? (selectedCompanyData?.bg ?? "rgba(108,99,255,0.06)")
-                            : "rgba(13,13,20,0.6)",
+                            ? (selectedCompanyData?.bg ?? "rgba(40,131,186,0.06)")
+                            : "#ffffff",
                           color: cvFileName
-                            ? (selectedCompanyData?.accent ?? "var(--accent-primary)")
-                            : "var(--text-dim)",
+                            ? (selectedCompanyData?.accent ?? "#2883ba")
+                            : "#9ca3af",
                           fontFamily: "var(--font-body)",
                           fontSize: 13,
                           cursor: "pointer",
@@ -441,9 +443,9 @@ export default function OnboardingPage() {
                           style={{
                             padding: "0 14px",
                             borderRadius: 10,
-                            border: "1px solid var(--border-subtle)",
+                            border: "1px solid rgba(40,131,186,0.2)",
                             background: "transparent",
-                            color: "var(--text-dim)",
+                            color: "#9ca3af",
                             cursor: "pointer",
                             fontSize: 16,
                           }}
@@ -498,19 +500,21 @@ export default function OnboardingPage() {
 
                         const borderColor = isSelected
                           ? isFull
-                            ? "rgba(239,68,68,0.6)"
-                            : "var(--accent-primary)"
-                          : "var(--border-subtle)";
+                            ? "rgba(239,68,68,0.5)"
+                            : "rgba(40,131,186,0.5)"
+                          : "rgba(40,131,186,0.15)";
 
                         const bgColor = isSelected
                           ? isFull
-                            ? "rgba(239,68,68,0.08)"
-                            : "rgba(108,99,255,0.10)"
-                          : "rgba(13,13,20,0.5)";
+                            ? "rgba(239,68,68,0.06)"
+                            : "rgba(40,131,186,0.08)"
+                          : "#ffffff";
 
                         const boxShadow = isSelected && isFull
-                          ? "0 0 16px rgba(239,68,68,0.2)"
-                          : "none";
+                          ? "0 0 16px rgba(239,68,68,0.15)"
+                          : isSelected
+                          ? "0 0 16px rgba(40,131,186,0.15)"
+                          : "0 1px 6px rgba(13,58,95,0.05)";
 
                         return (
                           <motion.button
@@ -556,8 +560,8 @@ export default function OnboardingPage() {
                                 fontSize: 13,
                                 fontWeight: 700,
                                 color: isSelected
-                                  ? isFull ? "#ef4444" : "var(--accent-primary)"
-                                  : "var(--text-primary)",
+                                  ? isFull ? "#ef4444" : "#2883ba"
+                                  : "#0d3a5f",
                                 marginBottom: 3,
                                 paddingRight: opt.badge ? 32 : 0,
                                 lineHeight: 1.2,
@@ -627,12 +631,12 @@ export default function OnboardingPage() {
                   nextStyle={{
                     background: selectedCompanyData
                       ? `linear-gradient(135deg, ${selectedCompanyData.accent}, ${selectedCompanyData.accent}CC)`
-                      : "linear-gradient(135deg, var(--accent-primary), #8B5CF6)",
+                      : "#2883ba",
                     border: "none",
                     color: "#fff",
                     boxShadow: selectedCompanyData
                       ? `0 0 20px ${selectedCompanyData.accent}40`
-                      : "0 0 20px rgba(108,99,255,0.3)",
+                      : "0 0 20px rgba(40,131,186,0.3)",
                   }}
                 />
               </div>
@@ -649,10 +653,11 @@ function StepHeader({ number, title, sub }: { number: number; title: string; sub
       <p
         style={{
           fontSize: 11,
-          color: "var(--accent-secondary)",
+          color: "#1ca2a2",
           letterSpacing: "0.12em",
           fontFamily: "var(--font-body)",
           marginBottom: 8,
+          fontWeight: 700,
         }}
       >
         STEP {number} OF 3
@@ -732,9 +737,9 @@ function FormField({ label, placeholder, value, onChange }: {
           width: "100%",
           padding: "13px 16px",
           borderRadius: 10,
-          border: "1px solid var(--border-subtle)",
-          background: "rgba(13,13,20,0.8)",
-          color: "var(--text-primary)",
+          border: "1px solid rgba(40,131,186,0.2)",
+          background: "#ffffff",
+          color: "#0d3a5f",
           fontFamily: "var(--font-body)",
           fontSize: 15,
           outline: "none",
@@ -742,11 +747,11 @@ function FormField({ label, placeholder, value, onChange }: {
           boxSizing: "border-box" as const,
         }}
         onFocus={(e) => {
-          e.target.style.borderColor = "var(--border-active)";
-          e.target.style.boxShadow = "0 0 0 3px rgba(108,99,255,0.12)";
+          e.target.style.borderColor = "#2883ba";
+          e.target.style.boxShadow = "0 0 0 3px rgba(40,131,186,0.12)";
         }}
         onBlur={(e) => {
-          e.target.style.borderColor = "var(--border-subtle)";
+          e.target.style.borderColor = "rgba(40,131,186,0.2)";
           e.target.style.boxShadow = "none";
         }}
       />
@@ -769,12 +774,12 @@ function ToggleButton({ selected, onClick, children, accent }: {
         padding: "12px 16px",
         borderRadius: 10,
         border: selected
-          ? `1px solid ${accent ? accent + "80" : "var(--accent-primary)"}`
-          : "1px solid var(--border-subtle)",
+          ? `1px solid ${accent ? accent + "80" : "rgba(40,131,186,0.5)"}`
+          : "1px solid rgba(40,131,186,0.18)",
         background: selected
-          ? (accent ? `${accent}14` : "rgba(108,99,255,0.12)")
-          : "rgba(13,13,20,0.6)",
-        color: selected ? activeColor : "var(--text-secondary)",
+          ? (accent ? `${accent}12` : "rgba(40,131,186,0.08)")
+          : "#ffffff",
+        color: selected ? activeColor : "#4a6a8a",
         fontFamily: "var(--font-body)",
         fontSize: 13,
         cursor: "pointer",
@@ -803,12 +808,13 @@ function NavButtons({ onBack, onNext, canNext = true, hideBack = false, nextLabe
           style={{
             padding: "13px 24px",
             borderRadius: 10,
-            border: "1px solid var(--border-subtle)",
+            border: "1px solid rgba(40,131,186,0.2)",
             background: "transparent",
-            color: "var(--text-secondary)",
+            color: "#4a6a8a",
             fontFamily: "var(--font-body)",
             fontSize: 14,
             cursor: "pointer",
+            fontWeight: 500,
           }}
         >
           ← Back
@@ -823,15 +829,16 @@ function NavButtons({ onBack, onNext, canNext = true, hideBack = false, nextLabe
           flex: 1,
           padding: "13px 24px",
           borderRadius: 10,
-          border: "1px solid var(--border-active)",
-          background: "rgba(108,99,255,0.08)",
-          color: canNext ? "var(--text-primary)" : "var(--text-dim)",
+          border: "none",
+          background: canNext ? "#2883ba" : "rgba(40,131,186,0.25)",
+          color: "#ffffff",
           fontFamily: "var(--font-body)",
           fontSize: 14,
           fontWeight: 600,
           cursor: canNext ? "pointer" : "not-allowed",
-          opacity: canNext ? 1 : 0.5,
-          transition: "box-shadow 0.2s",
+          opacity: canNext ? 1 : 0.6,
+          transition: "box-shadow 0.2s, opacity 0.2s",
+          boxShadow: canNext ? "0 4px 16px rgba(40,131,186,0.25)" : "none",
           ...nextStyle,
         }}
       >

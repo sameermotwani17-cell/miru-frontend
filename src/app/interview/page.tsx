@@ -876,11 +876,11 @@ function InterviewPage() {
                 borderRadius: 12,
                 background:
                   m.role === "user"
-                    ? "rgba(108,99,255,0.18)"
+                    ? "rgba(40,131,186,0.22)"
                     : "rgba(255,255,255,0.06)",
                 border:
                   m.role === "user"
-                    ? "1px solid rgba(108,99,255,0.35)"
+                    ? "1px solid rgba(40,131,186,0.4)"
                     : "1px solid rgba(255,255,255,0.1)",
                 color: "#f0f0ff",
                 fontFamily: "var(--font-body)",
