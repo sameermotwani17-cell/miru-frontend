@@ -119,6 +119,7 @@ export function startSpeechRecognition(
       if (!hasDetectedSpeech) {
         hasDetectedSpeech = true;
         speechStartTime = Date.now();
+        console.log("Speech detected");
       }
       onResult(text);
       resetSilenceTimer();

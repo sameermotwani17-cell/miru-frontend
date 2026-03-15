@@ -196,6 +196,7 @@ function InterviewPage() {
   const wrapUpTriggeredRef = useRef(false);
   const requestInFlightRef = useRef(false);
   const restartRecordingAfterSilenceRef = useRef(false);
+  const silenceRetriesRef = useRef(0);
   const pendingRequestRef = useRef<{ kind: "start" | "answer"; answer: string } | null>(null);
 
   useEffect(() => {
@@ -454,7 +455,7 @@ function InterviewPage() {
         const agentReply = res.interviewer_response?.trim() ?? "";
         const nextQuestion = res.next_question?.trim() || "Please continue.";
 
-        console.log("Question received from backend");
+        console.log("Next question received");
         // Update current question tracking for the next turn
         currentQuestionIdRef.current = res.question_id ?? `q${machine.turnCount + 1}`;
         currentQuestionTextRef.current = nextQuestion;
@@ -582,15 +583,31 @@ function InterviewPage() {
         },
         onEnd: () => {
           console.log("Speech ended");
-          if (statusRef.current === "LISTENING") {
-            dispatch({ type: "TRANSCRIBING" });
-            if (submitTimeoutRef.current) {
-              clearTimeout(submitTimeoutRef.current);
+          if (statusRef.current !== "LISTENING") return;
+
+          const answer = transcriptRef.current.trim();
+          if (!answer) {
+            console.warn("No transcript captured — restarting recording");
+            silenceRetriesRef.current += 1;
+            if (silenceRetriesRef.current > 2) {
+              console.warn("Silence limit reached — returning to question");
+              silenceRetriesRef.current = 0;
+              dispatch({ type: "BACK_TO_QUESTION" });
+              return;
             }
-            submitTimeoutRef.current = setTimeout(() => {
-              void executeAnswerTurn(transcriptRef.current, true);
-            }, 220);
+            restartRecordingAfterSilenceRef.current = true;
+            dispatch({ type: "BACK_TO_QUESTION" });
+            return;
           }
+
+          silenceRetriesRef.current = 0;
+          dispatch({ type: "TRANSCRIBING" });
+          if (submitTimeoutRef.current) {
+            clearTimeout(submitTimeoutRef.current);
+          }
+          submitTimeoutRef.current = setTimeout(() => {
+            void executeAnswerTurn(answer, true);
+          }, 220);
         },
       }
     );
