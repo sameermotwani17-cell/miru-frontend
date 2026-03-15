@@ -48,12 +48,13 @@ function SectionHeader({ label, title }: { label: string; title: string }) {
 
 function getLowestDimension(scores: RadarScores): keyof RadarScores {
   return (Object.keys(scores) as (keyof RadarScores)[]).reduce((a, b) =>
-    scores[a] < scores[b] ? a : b
+    Number(scores[a] ?? 0) < Number(scores[b] ?? 0) ? a : b
   );
 }
 
 function getAvgScore(scores: RadarScores): number {
-  const vals = Object.values(scores);
+  const vals = Object.values(scores).map((v) => Number(v ?? 0));
+  if (!vals.length) return 0;
   return vals.reduce((a, b) => a + b, 0) / vals.length;
 }
 
@@ -206,11 +207,18 @@ export default function DebriefContent() {
     );
   }
 
-  const radar_scores: RadarScores = results.radar_scores ?? {
+  const rawScores = results.radar_scores ?? {
     communication: 0,
     clarity: 0,
     cultural_fit: 0,
     problem_solving: 0,
+  };
+  // Coerce any null/undefined values returned by the API to 0
+  const radar_scores: RadarScores = {
+    communication: Number(rawScores.communication ?? 0),
+    clarity: Number(rawScores.clarity ?? 0),
+    cultural_fit: Number(rawScores.cultural_fit ?? 0),
+    problem_solving: Number(rawScores.problem_solving ?? 0),
   };
   const transcript = results.transcript ?? [];
   const feedback = results.feedback ?? "";

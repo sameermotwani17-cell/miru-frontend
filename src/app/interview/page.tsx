@@ -21,6 +21,7 @@ import {
   type RadarScores,
   type TranscriptHistoryItem,
 } from "@/lib/types";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 type MachineStatus =
   | "IDLE"
@@ -158,7 +159,7 @@ function interviewReducer(state: MachineState, action: MachineAction): MachineSt
   }
 }
 
-export default function InterviewPage() {
+function InterviewPage() {
   const router = useRouter();
   const [machine, dispatch] = useReducer(interviewReducer, initialMachineState);
 
@@ -530,12 +531,19 @@ export default function InterviewPage() {
     }
   }, [machine.status, machine.sessionId, executeStartTurn]);
 
-  // Fallback redirect: when interview completes via timer or any path
+  // Fallback redirect: covers timer-expiry path (finalizeInterview) which doesn't
+  // set its own redirect. Uses window.location.href + a delay longer than the
+  // 1500ms used in executeAnswerTurn/executeStartTurn so it only fires if those
+  // paths somehow didn't navigate (prevents immediate race / blank screen).
   useEffect(() => {
     if (machine.status === "COMPLETED" && machine.sessionId) {
-      router.push(`/debrief?session_id=${machine.sessionId}`);
+      const sid = machine.sessionId;
+      const t = setTimeout(() => {
+        window.location.href = `/debrief?session_id=${sid}`;
+      }, 2000);
+      return () => clearTimeout(t);
     }
-  }, [machine.status, machine.sessionId, router]);
+  }, [machine.status, machine.sessionId]);
 
   useEffect(() => {
     if (timerMaxSecs > 0 && timerSeconds === 0 && machine.status !== "COMPLETED") {
@@ -776,7 +784,7 @@ export default function InterviewPage() {
             gap: 10,
           }}
         >
-          {machine.messages.map((m, idx) => (
+          {(machine.messages ?? []).map((m, idx) => (
             <div
               key={`${m.role}-${idx}`}
               style={{
@@ -925,5 +933,13 @@ export default function InterviewPage() {
       </div>
 
     </div>
+  );
+}
+
+export default function InterviewPageWithBoundary() {
+  return (
+    <ErrorBoundary>
+      <InterviewPage />
+    </ErrorBoundary>
   );
 }

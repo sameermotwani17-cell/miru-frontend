@@ -17,7 +17,7 @@ interface MiruRadarChartProps {
 export default function MiruRadarChart({ scores }: MiruRadarChartProps) {
   const data = (Object.keys(scores) as (keyof RadarScores)[]).map((key) => ({
     subject: DIMENSION_LABELS[key],
-    score: scores[key],
+    score: Number(scores[key] ?? 0),
     fullMark: 10,
   }));
 
