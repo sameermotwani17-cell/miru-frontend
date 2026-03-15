@@ -458,9 +458,10 @@ export default function InterviewPage() {
 
     const maxSecs =
       durId === "demo" ? 180 :
+      durId === "10min" ? 600 :
       durId === "15min" ? 900 :
       durId === "30min" ? 1800 :
-      durId === "45min" ? 2700 : 0;
+      durId === "60min" ? 3600 : 0;
 
     setTimerMaxSecs(maxSecs);
 

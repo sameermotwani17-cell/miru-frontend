@@ -1,8 +1,11 @@
 "use client";
 
+import { useState } from "react";
+import Image from "next/image";
 import { motion } from "framer-motion";
 
 interface CompanyCardProps {
+  id: string;
   name: string;
   label: string;
   descriptor: string;
@@ -13,6 +16,7 @@ interface CompanyCardProps {
 }
 
 export default function CompanyCard({
+  id,
   name,
   label,
   descriptor,
@@ -21,6 +25,8 @@ export default function CompanyCard({
   selected,
   onSelect,
 }: CompanyCardProps) {
+  const [logoError, setLogoError] = useState(false);
+
   return (
     <motion.button
       onClick={onSelect}
@@ -48,7 +54,7 @@ export default function CompanyCard({
         width: "100%",
       }}
     >
-      {/* Monogram */}
+      {/* Logo / Monogram */}
       <div
         style={{
           width: 44,
@@ -60,6 +66,7 @@ export default function CompanyCard({
           alignItems: "center",
           justifyContent: "center",
           marginBottom: 16,
+          overflow: "hidden",
           fontSize: 18,
           fontFamily: "var(--font-japanese)",
           color: selected ? accent : "var(--text-secondary)",
@@ -67,7 +74,18 @@ export default function CompanyCard({
           transition: "all 0.2s",
         }}
       >
-        {label.charAt(0)}
+        {!logoError ? (
+          <Image
+            src={`/logos/${id}.png`}
+            alt={name}
+            width={40}
+            height={40}
+            style={{ objectFit: "contain", borderRadius: 8 }}
+            onError={() => setLogoError(true)}
+          />
+        ) : (
+          label.charAt(0)
+        )}
       </div>
 
       {/* Name */}

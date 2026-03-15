@@ -16,7 +16,7 @@ const slideVariants = {
 };
 
 type LanguageMode = "jp" | "english";
-type DurationMode = "demo" | "15min" | "30min" | "45min" | "full";
+type DurationMode = "demo" | "10min" | "15min" | "30min" | "60min";
 
 interface DurationOption {
   id: DurationMode;
@@ -25,15 +25,15 @@ interface DurationOption {
   description: string;
   badge: string | null;
   badgeColor: "amber" | "indigo" | "red" | null;
-  questions: number | null; // null = unlimited
+  questions: number | null;
   durationMins: number;
 }
 
 const DURATION_OPTIONS: DurationOption[] = [
   {
     id: "demo",
-    label: "Demo",
-    sublabel: "3 questions · ~3 min",
+    label: "3 min",
+    sublabel: "Quick test",
     description: "Quick taste of the experience. No pressure.",
     badge: "DEMO",
     badgeColor: "amber",
@@ -41,40 +41,40 @@ const DURATION_OPTIONS: DurationOption[] = [
     durationMins: 3,
   },
   {
-    id: "15min",
-    label: "15 min",
-    sublabel: "~6 questions",
+    id: "10min",
+    label: "10 min",
+    sublabel: "Warmup interview",
     description: "Light warm-up session for busy days.",
     badge: null,
     badgeColor: null,
-    questions: 6,
+    questions: null,
+    durationMins: 10,
+  },
+  {
+    id: "15min",
+    label: "15 min",
+    sublabel: "Standard practice",
+    description: "The recommended depth for real practice.",
+    badge: "POPULAR",
+    badgeColor: "indigo",
+    questions: null,
     durationMins: 15,
   },
   {
     id: "30min",
     label: "30 min",
-    sublabel: "~12 questions",
-    description: "The recommended depth for real practice.",
-    badge: "POPULAR",
-    badgeColor: "indigo",
-    questions: 12,
-    durationMins: 30,
-  },
-  {
-    id: "45min",
-    label: "45 min",
-    sublabel: "~18 questions",
+    sublabel: "Deep practice",
     description: "Extended session for serious preparation.",
     badge: null,
     badgeColor: null,
-    questions: 18,
-    durationMins: 45,
+    questions: null,
+    durationMins: 30,
   },
   {
-    id: "full",
-    label: "Full Throttle",
-    sublabel: "All questions · no limit",
-    description: "Every question. No clock. Maximum exposure.",
+    id: "60min",
+    label: "60 min",
+    sublabel: "Full simulation",
+    description: "Every minute. Maximum exposure.",
     badge: "INTENSE",
     badgeColor: "red",
     questions: null,
@@ -346,6 +346,7 @@ export default function OnboardingPage() {
                   {COMPANIES.map((c) => (
                     <CompanyCard
                       key={c.id}
+                      id={c.id}
                       name={c.name}
                       label={c.label}
                       descriptor={c.descriptor}
@@ -525,7 +526,7 @@ export default function OnboardingPage() {
                     >
                       {DURATION_OPTIONS.map((opt) => {
                         const isSelected = durationMode === opt.id;
-                        const isFull = opt.id === "full";
+                        const isFull = opt.id === "60min";
 
                         const borderColor = isSelected
                           ? isFull
