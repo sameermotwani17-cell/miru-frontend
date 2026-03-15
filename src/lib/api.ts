@@ -26,6 +26,10 @@ function normalizeCompanyForBackend(company: string): string {
 
 const BASE = process.env.NEXT_PUBLIC_API_URL;
 
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  "https://miru-backend-production.up.railway.app";
+
 class ApiError extends Error {
   constructor(
     public status: number,
@@ -126,7 +130,7 @@ export async function sendInterviewTurn(
 
     try {
       const response = await fetchWithTimeout(
-        "https://miru-backend-production.up.railway.app/api/interview/turn",
+        `${API_URL}/api/interview/turn`,
         {
           method: "POST",
           headers: {

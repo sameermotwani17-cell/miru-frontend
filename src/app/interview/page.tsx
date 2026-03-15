@@ -58,7 +58,8 @@ type MachineAction =
   | { type: "WRAP_UP" }
   | { type: "COMPLETED" }
   | { type: "ERROR"; error: string }
-  | { type: "RETRY_FROM_ERROR" };
+  | { type: "RETRY_FROM_ERROR" }
+  | { type: "BACK_TO_QUESTION" };
 
 const initialMachineState: MachineState = {
   status: "IDLE",
@@ -154,6 +155,12 @@ function interviewReducer(state: MachineState, action: MachineAction): MachineSt
         status: state.messages.length ? "QUESTION" : "STARTING",
         error: "",
       };
+    case "BACK_TO_QUESTION":
+      return {
+        ...state,
+        status: "QUESTION",
+        error: "",
+      };
     default:
       return state;
   }
@@ -188,6 +195,7 @@ function InterviewPage() {
   const interviewCompleteRef = useRef(false);
   const wrapUpTriggeredRef = useRef(false);
   const requestInFlightRef = useRef(false);
+  const restartRecordingAfterSilenceRef = useRef(false);
   const pendingRequestRef = useRef<{ kind: "start" | "answer"; answer: string } | null>(null);
 
   useEffect(() => {
@@ -381,7 +389,20 @@ function InterviewPage() {
         return;
       }
 
-      const safeAnswer = answer.trim() || "[No speech detected]";
+      const safeAnswer = answer.trim();
+      if (!safeAnswer) {
+        console.warn("No speech detected, restarting recording");
+        restartRecordingAfterSilenceRef.current = true;
+        dispatch({ type: "BACK_TO_QUESTION" });
+        return;
+      }
+
+      if (requestInFlightRef.current) {
+        console.warn("Request already in flight, ignoring duplicate turn");
+        return;
+      }
+
+      console.log("Submitting interview turn");
       requestInFlightRef.current = true;
       pendingRequestRef.current = { kind: "answer", answer: safeAnswer };
 
@@ -433,6 +454,7 @@ function InterviewPage() {
         const agentReply = res.interviewer_response?.trim() ?? "";
         const nextQuestion = res.next_question?.trim() || "Please continue.";
 
+        console.log("Question received from backend");
         // Update current question tracking for the next turn
         currentQuestionIdRef.current = res.question_id ?? `q${machine.turnCount + 1}`;
         currentQuestionTextRef.current = nextQuestion;
@@ -542,6 +564,7 @@ function InterviewPage() {
       return;
     }
 
+    console.log("Recording started");
     setTranscript("");
     transcriptRef.current = "";
     dispatch({ type: "LISTENING" });
@@ -553,15 +576,17 @@ function InterviewPage() {
       },
       {
         lang: machine.languageMode === "jp" ? "ja-JP" : "en-US",
-        // Explicit 3000ms silence timeout — matches the default in voice.ts but
-        // stated here so it's visible and easy to tune per-language in future.
-        silenceTimeoutMs: 3000,
+        silenceTimeoutMs: 4500,
         onError: (message) => {
           dispatch({ type: "ERROR", error: message });
         },
         onEnd: () => {
+          console.log("Speech ended");
           if (statusRef.current === "LISTENING") {
             dispatch({ type: "TRANSCRIBING" });
+            if (submitTimeoutRef.current) {
+              clearTimeout(submitTimeoutRef.current);
+            }
             submitTimeoutRef.current = setTimeout(() => {
               void executeAnswerTurn(transcriptRef.current, true);
             }, 220);
@@ -586,14 +611,16 @@ function InterviewPage() {
       recognitionRef.current.stop();
       recognitionRef.current = null;
     }
+  }, []);
 
-    if (statusRef.current === "LISTENING") {
-      dispatch({ type: "TRANSCRIBING" });
-      submitTimeoutRef.current = setTimeout(() => {
-        void executeAnswerTurn(transcriptRef.current, true);
-      }, 160);
+  // Auto-restart recording after a no-speech silence (PATCH 1)
+  useEffect(() => {
+    if (machine.status === "QUESTION" && restartRecordingAfterSilenceRef.current) {
+      restartRecordingAfterSilenceRef.current = false;
+      const timer = setTimeout(() => startRecording(), 600);
+      return () => clearTimeout(timer);
     }
-  }, [executeAnswerTurn]);
+  }, [machine.status, startRecording]);
 
   const retryFailedRequest = useCallback(() => {
     if (wrapUpTriggeredRef.current) {
