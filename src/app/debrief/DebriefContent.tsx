@@ -22,6 +22,7 @@ type CoachingTurn = {
   questionId: string;
   question: string;
   answer: string;
+  userAnswer: string;
   score: number;
   feedback: string;
   betterExample: string;
@@ -159,6 +160,7 @@ function normalizeCoachingTurns(raw: DebriefApiResponse): CoachingTurn[] {
         questionId: String(turn.question_id ?? `q${index + 1}`),
         question: String(turn.question ?? turn.prompt ?? turn.question_text ?? ""),
         answer: String(turn.answer ?? turn.user_answer ?? ""),
+        userAnswer: String(turn.user_answer ?? ""),
         score: Math.max(0, Math.min(10, computedScore || 0)),
         feedback: String(turn.feedback ?? turn.coaching_feedback ?? "No feedback available."),
         betterExample: String(
@@ -174,6 +176,7 @@ function normalizeCoachingTurns(raw: DebriefApiResponse): CoachingTurn[] {
       questionId: String(turn.question_id ?? `q${index + 1}`),
       question: String(turn.question ?? ""),
       answer: String(turn.user_answer ?? ""),
+      userAnswer: String(turn.user_answer ?? ""),
       score: 0,
       feedback: "No feedback available.",
       betterExample: "No coaching example available.",
@@ -446,6 +449,9 @@ export default function DebriefContent() {
   const avgScore = radarKeys.length ? getAvgScore(safeScores) : 0;
   const company = session.getCompany() ?? "";
   const sessionId = session.getSessionId() ?? "";
+  const transcript = results.transcript ?? [];
+
+  console.log("Transcript data:", transcript);
 
   return (
     <div className="page-light" style={{ minHeight: "100vh", paddingBottom: 120 }}>
@@ -634,6 +640,10 @@ export default function DebriefContent() {
                   className="glass-card"
                   style={{ padding: "24px 24px", borderColor: "rgba(108,99,255,0.2)" }}
                 >
+                  {(() => {
+                    const resolvedAnswer = item.answer || item.userAnswer;
+                    return (
+                      <>
                   <span
                     style={{
                       fontFamily: "var(--font-body)",
@@ -700,7 +710,7 @@ export default function DebriefContent() {
                           lineHeight: 1.6,
                         }}
                       >
-                        {item.answer.trim() ? item.answer : "No speech detected"}
+                        {resolvedAnswer ? resolvedAnswer : "No speech detected"}
                       </p>
                     </div>
 
@@ -775,6 +785,9 @@ export default function DebriefContent() {
                       </p>
                     </div>
                   </div>
+                      </>
+                    );
+                  })()}
                 </motion.div>
               ))}
             </div>
