@@ -24,7 +24,7 @@ type CoachingTurn = {
   answer: string;
   score: number;
   feedback: string;
-  better_example: string;
+  better_example: string | null;
 };
 
 // Increased polling window to allow LLM evaluation to complete (up to 45 s)
@@ -116,9 +116,36 @@ function avgFromScores(scores: unknown): number | undefined {
   return values.reduce((a, b) => a + b, 0) / values.length;
 }
 
+// ── Normalization helpers ────────────────────────────────────────────────────
+
+/**
+ * Remaps per-turn `evaluation` → `scores` so that normalizeScores (which only
+ * reads `.scores`) can compute the radar chart when the backend stores dimension
+ * scores under `evaluation` instead of `scores`.
+ */
+function remapEvaluationToScores(data: DebriefApiResponse): DebriefApiResponse {
+  const rawTurns = Array.isArray(data.turn_feedback)
+    ? data.turn_feedback
+    : Object.values(data.turn_feedback ?? {});
+
+  if (!rawTurns.length) return data;
+
+  const remapped = rawTurns.map((item) => {
+    const t = (item ?? {}) as Record<string, unknown>;
+    // Only remap when `scores` is absent and `evaluation` is a plain object
+    if (!t.scores && t.evaluation && typeof t.evaluation === "object" && !Array.isArray(t.evaluation)) {
+      return { ...t, scores: t.evaluation };
+    }
+    return t;
+  });
+
+  return { ...data, turn_feedback: remapped };
+}
+
 function normalizeCoachingTurns(raw: DebriefApiResponse): CoachingTurn[] {
   console.log("turn_feedback raw:", raw.turn_feedback);
 
+  // STEP 1 — normalise array vs object-map shape
   const turns = Array.isArray(raw.turn_feedback)
     ? raw.turn_feedback
     : Object.values(raw.turn_feedback || {});
@@ -127,6 +154,8 @@ function normalizeCoachingTurns(raw: DebriefApiResponse): CoachingTurn[] {
     console.log("first turn keys:", Object.keys(turns[0] as object));
     return turns.map((item, index) => {
       const turn = (item ?? {}) as Record<string, unknown>;
+
+      // STEP 2 — score: explicit fields → averaged scores obj → averaged evaluation obj
       const explicitScore =
         toNumber(turn.score) ??
         toNumber(turn.final_score) ??
@@ -135,6 +164,8 @@ function normalizeCoachingTurns(raw: DebriefApiResponse): CoachingTurn[] {
         explicitScore ??
         avgFromScores(turn.scores) ??
         avgFromScores(turn.evaluation);
+
+      // STEP 2 — question: multiple alias keys, category as last resort
       const question =
         String(
           turn.question ??
@@ -143,29 +174,42 @@ function normalizeCoachingTurns(raw: DebriefApiResponse): CoachingTurn[] {
           turn.question_prompt ??
           turn.question_category ??
           ""
-        ) || "Interview Question";
-      const answer =
-        String(
-          turn.answer ??
-          turn.user_answer ??
-          turn.candidate_answer ??
-          ""
-        ) || "User response not captured";
+        ) || "Interview Question";   // STEP 3 fallback
+
+      // STEP 2 — answer: multiple alias keys
+      // Return "" when absent so the display renders the "No speech detected" fallback
+      const answer = String(
+        turn.answer ??
+        turn.user_answer ??
+        turn.candidate_answer ??
+        ""
+      );                             // STEP 3: display uses || "No speech detected"
+
+      // STEP 2 — feedback: explicit field → coaching alias → evaluation notes
+      const feedback = String(
+        turn.feedback ??
+        turn.coaching_feedback ??
+        (turn.evaluation as Record<string, unknown> | undefined)?.notes ??
+        "No feedback available."     // STEP 3 fallback
+      );
+
+      // STEP 2 — better example: multiple alias keys
+      // rewrite_example is the raw backend field name from feedback_engine
+      const betterExample =
+        turn.better_example ??
+        turn.rewrite_example ??
+        turn.rewrite ??
+        turn.improved_answer ??
+        null;
+      const better_example = betterExample !== null ? String(betterExample) : null;
 
       return {
         questionId: String(turn.question_id ?? `q${index + 1}`),
         question,
         answer,
         score: Math.max(0, Math.min(10, computedScore || 0)),
-        feedback: String(
-          turn.feedback ??
-          turn.coaching_feedback ??
-          (turn.evaluation as Record<string, unknown> | undefined)?.notes ??
-          "No feedback available."
-        ),
-        better_example: String(
-          turn.better_example ?? turn.rewrite ?? turn.improved_answer ?? "No coaching example available."
-        ),
+        feedback,
+        better_example,
       };
     });
   }
@@ -183,7 +227,7 @@ function normalizeCoachingTurns(raw: DebriefApiResponse): CoachingTurn[] {
     answer: candidateTurns[index]?.text ?? "No answer captured",
     score: 0,
     feedback: "No feedback available.",
-    better_example: "No coaching example available.",
+    better_example: null,
   }));
 }
 
@@ -339,8 +383,12 @@ export default function DebriefContent() {
         return;
       }
 
+      // Remap evaluation→scores per turn so normalizeScores can average them
+      // when the backend stores dimension scores under `evaluation` instead of `scores`.
+      const dataForScores = remapEvaluationToScores(data);
+
       const normalized: FullResults = {
-        radar_scores: normalizeScores(data),
+        radar_scores: normalizeScores(dataForScores),
         transcript: Array.isArray(data.transcript) ? data.transcript : [],
         feedback: data.feedback ?? "",
         hiring_signal: data.hiring_signal ?? "",
@@ -705,7 +753,7 @@ export default function DebriefContent() {
                     Better Answer Example
                   </h4>
                   <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-page-body)", lineHeight: 1.7 }}>
-                    {item.better_example}
+                    {item.better_example ?? "No coaching example available."}
                   </p>
                 </motion.div>
               ))}
