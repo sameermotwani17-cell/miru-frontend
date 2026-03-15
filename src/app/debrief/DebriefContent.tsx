@@ -18,6 +18,15 @@ type DebriefApiResponse = Partial<FullResults> & {
   turn_feedback?: unknown[];
 };
 
+type CoachingTurn = {
+  questionId: string;
+  question: string;
+  answer: string;
+  score: number;
+  feedback: string;
+  betterExample: string;
+};
+
 const MAX_ATTEMPTS = 8;
 const INTERVAL_MS = 2000;
 
@@ -120,6 +129,58 @@ function getScoreColor(score: number): string {
   return "var(--accent-warm)";
 }
 
+function toNumber(value: unknown): number | null {
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function avgFromScores(scores: unknown): number {
+  if (!scores || typeof scores !== "object") return 0;
+  const values = Object.values(scores as Record<string, unknown>)
+    .map((v) => toNumber(v))
+    .filter((v): v is number => v !== null);
+  if (!values.length) return 0;
+  return values.reduce((a, b) => a + b, 0) / values.length;
+}
+
+function normalizeCoachingTurns(raw: DebriefApiResponse): CoachingTurn[] {
+  const feedbackTurns = Array.isArray(raw.turn_feedback) ? raw.turn_feedback : [];
+
+  if (feedbackTurns.length) {
+    return feedbackTurns.map((item, index) => {
+      const turn = (item ?? {}) as Record<string, unknown>;
+      const explicitScore =
+        toNumber(turn.score) ??
+        toNumber(turn.final_score) ??
+        toNumber(turn.overall_score);
+      const computedScore = explicitScore ?? avgFromScores(turn.scores);
+
+      return {
+        questionId: String(turn.question_id ?? `q${index + 1}`),
+        question: String(turn.question ?? turn.prompt ?? turn.question_text ?? ""),
+        answer: String(turn.answer ?? turn.user_answer ?? ""),
+        score: Math.max(0, Math.min(10, computedScore || 0)),
+        feedback: String(turn.feedback ?? turn.coaching_feedback ?? "No feedback available."),
+        betterExample: String(
+          turn.better_example ?? turn.rewrite ?? turn.improved_answer ?? "No coaching example available."
+        ),
+      };
+    });
+  }
+
+  const transcriptTurns = Array.isArray(raw.transcript) ? raw.transcript : [];
+  return transcriptTurns.map((turn, index) => {
+    return {
+      questionId: String(turn.question_id ?? `q${index + 1}`),
+      question: String(turn.question ?? ""),
+      answer: String(turn.user_answer ?? ""),
+      score: 0,
+      feedback: "No feedback available.",
+      betterExample: "No coaching example available.",
+    };
+  });
+}
+
 function renderFeedback(fb: string | FeedbackObject | null | undefined) {
   if (!fb) {
     return (
@@ -220,6 +281,7 @@ function renderFeedback(fb: string | FeedbackObject | null | undefined) {
 export default function DebriefContent() {
   const router = useRouter();
   const [results, setResults] = useState<FullResults | null>(null);
+  const [coachingTurns, setCoachingTurns] = useState<CoachingTurn[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMessage, setLoadingMessage] = useState("");
   const [error, setError] = useState("");
@@ -251,6 +313,7 @@ export default function DebriefContent() {
       };
 
       setResults(normalized);
+      setCoachingTurns(normalizeCoachingTurns(raw));
     } catch {
       setError("Debrief generation took longer than expected.");
     } finally {
@@ -373,7 +436,6 @@ export default function DebriefContent() {
   }
 
   const safeScores = normalizeScores(results);
-  const transcript = results.transcript ?? [];
   const feedback = results.feedback ?? null;
   const hiringSignal = results.hiring_signal ?? "";
 
@@ -546,9 +608,9 @@ export default function DebriefContent() {
           </div>
         </section>
 
-        {transcript && transcript.length > 0 && (
+        {coachingTurns.length > 0 && (
           <section style={{ marginBottom: 80 }}>
-            <SectionHeader label="SECTION 03" title="Interview Transcript" />
+            <SectionHeader label="SECTION 03" title="Coaching Breakdown" />
             <p
               style={{
                 fontFamily: "var(--font-body)",
@@ -558,19 +620,19 @@ export default function DebriefContent() {
                 lineHeight: 1.6,
               }}
             >
-              Full record of questions asked and your responses.
+              Question-by-question review with coaching guidance and example rewrites.
             </p>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-              {transcript.map((turn, i) => (
+              {coachingTurns.map((item, i) => (
                 <motion.div
-                  key={turn.question_id}
+                  key={item.questionId}
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true, margin: "-60px" }}
                   transition={{ duration: 0.5, delay: i * 0.05, ease: [0.16, 1, 0.3, 1] }}
                   className="glass-card"
-                  style={{ padding: "28px 28px" }}
+                  style={{ padding: "24px 24px", borderColor: "rgba(108,99,255,0.2)" }}
                 >
                   <span
                     style={{
@@ -584,47 +646,134 @@ export default function DebriefContent() {
                   >
                     QUESTION {i + 1}
                   </span>
-                  <p
-                    style={{
-                      fontFamily: "var(--font-display)",
-                      fontSize: 16,
-                      fontWeight: 600,
-                      color: "var(--text-primary)",
-                      marginBottom: 12,
-                      lineHeight: 1.4,
-                    }}
-                  >
-                    {turn.question}
-                  </p>
-                  <div
-                    style={{
-                      padding: "12px 14px",
-                      borderRadius: 8,
-                      background: "rgba(255,255,255,0.02)",
-                      border: "1px solid var(--border-subtle)",
-                    }}
-                  >
-                    <p
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                    <div>
+                      <h4
+                        style={{
+                          fontFamily: "var(--font-body)",
+                          fontSize: 12,
+                          color: "var(--accent-primary)",
+                          letterSpacing: "0.08em",
+                          marginBottom: 8,
+                        }}
+                      >
+                        Question
+                      </h4>
+                      <p
+                        style={{
+                          fontFamily: "var(--font-display)",
+                          fontSize: 16,
+                          fontWeight: 600,
+                          color: "var(--text-primary)",
+                          lineHeight: 1.5,
+                        }}
+                      >
+                        {item.question}
+                      </p>
+                    </div>
+
+                    <div
                       style={{
-                        fontSize: 11,
-                        color: "var(--text-dim)",
-                        letterSpacing: "0.08em",
-                        marginBottom: 6,
-                        fontFamily: "var(--font-body)",
+                        padding: "12px 14px",
+                        borderRadius: 8,
+                        background: "rgba(255,255,255,0.02)",
+                        border: "1px solid var(--border-subtle)",
                       }}
                     >
-                      YOU SAID
-                    </p>
-                    <p
-                      style={{
-                        fontFamily: "var(--font-body)",
-                        fontSize: 13,
-                        color: "var(--text-secondary)",
-                        lineHeight: 1.6,
-                      }}
-                    >
-                      {turn.user_answer || "[No speech detected]"}
-                    </p>
+                      <h4
+                        style={{
+                          fontFamily: "var(--font-body)",
+                          fontSize: 12,
+                          color: "var(--text-dim)",
+                          letterSpacing: "0.08em",
+                          marginBottom: 8,
+                        }}
+                      >
+                        Your Answer
+                      </h4>
+                      <p
+                        style={{
+                          fontFamily: "var(--font-body)",
+                          fontSize: 13,
+                          color: "var(--text-secondary)",
+                          lineHeight: 1.6,
+                        }}
+                      >
+                        {item.answer.trim() ? item.answer : "No speech detected"}
+                      </p>
+                    </div>
+
+                    <div>
+                      <h4
+                        style={{
+                          fontFamily: "var(--font-body)",
+                          fontSize: 12,
+                          color: "var(--accent-gold)",
+                          letterSpacing: "0.08em",
+                          marginBottom: 8,
+                        }}
+                      >
+                        Score
+                      </h4>
+                      <p
+                        style={{
+                          fontFamily: "var(--font-display)",
+                          fontSize: 15,
+                          color: "var(--text-primary)",
+                        }}
+                      >
+                        {item.score.toFixed(1)}/10
+                      </p>
+                    </div>
+
+                    <div>
+                      <h4
+                        style={{
+                          fontFamily: "var(--font-body)",
+                          fontSize: 12,
+                          color: "var(--accent-warm)",
+                          letterSpacing: "0.08em",
+                          marginBottom: 8,
+                        }}
+                      >
+                        Feedback
+                      </h4>
+                      <p
+                        style={{
+                          fontFamily: "var(--font-body)",
+                          fontSize: 13,
+                          color: "var(--text-page-body)",
+                          lineHeight: 1.6,
+                        }}
+                      >
+                        {item.feedback}
+                      </p>
+                    </div>
+
+                    <div>
+                      <h4
+                        style={{
+                          fontFamily: "var(--font-body)",
+                          fontSize: 12,
+                          color: "var(--accent-green)",
+                          letterSpacing: "0.08em",
+                          marginBottom: 8,
+                        }}
+                      >
+                        Better Answer Example
+                      </h4>
+                      <p
+                        style={{
+                          fontFamily: "var(--font-body)",
+                          fontSize: 13,
+                          color: "var(--text-page-body)",
+                          lineHeight: 1.7,
+                        }}
+                      >
+                        {item.betterExample}
+                      </p>
+                    </div>
                   </div>
                 </motion.div>
               ))}
@@ -682,11 +831,12 @@ export default function DebriefContent() {
                 </span>
               </div>
 
-              <div
-                className="glass-card radar-chart-wrapper"
-                style={{ padding: "16px 16px 8px", marginBottom: 20, height: 280, overflow: "hidden" }}
-              >
-                <MiruRadarChart scores={safeScores} />
+              <div className="glass-card radar-chart-wrapper" style={{ padding: "16px 16px 8px", marginBottom: 20 }}>
+                <div className="w-full h-[420px] flex items-center justify-center">
+                  <div style={{ width: 420, height: 320 }}>
+                    <MiruRadarChart scores={safeScores} />
+                  </div>
+                </div>
               </div>
             </div>
 
