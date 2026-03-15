@@ -32,7 +32,16 @@ const POLL_DELAY_MS = 700;
 
 function isReadyResponse(data: DebriefApiResponse | null): boolean {
   if (!data) return false;
-  return typeof data.status === "string" && data.status.toLowerCase() === "ready";
+  // Explicit ready status
+  if (typeof data.status === "string" && data.status.toLowerCase() === "ready") {
+    return true;
+  }
+  // Accept valid results even if status is missing or different
+  const hasTurnFeedback =
+    Array.isArray(data.turn_feedback) && data.turn_feedback.length > 0;
+  const hasScores =
+    !!(data.radar_scores ?? data.scores);
+  return hasTurnFeedback || hasScores;
 }
 
 function SectionHeader({ label, title }: { label: string; title: string }) {

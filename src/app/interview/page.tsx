@@ -353,6 +353,8 @@ function InterviewPage() {
         }
         dispatch({ type: "COMPLETED" });
         stopSpeech();
+        // give backend time to finalize result generation
+        await new Promise(resolve => setTimeout(resolve, 2000));
         router.push(`/debrief?session_id=${sid}`);
         return;
       }
@@ -451,6 +453,8 @@ function InterviewPage() {
           session.setInterviewComplete(true);
           dispatch({ type: "COMPLETED" });
           stopSpeech();
+          // give backend time to finalize result generation
+          await new Promise(resolve => setTimeout(resolve, 2000));
           router.push(`/debrief?session_id=${sid}`);
           return;
         }
