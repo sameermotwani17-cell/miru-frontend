@@ -75,7 +75,7 @@ const initialMachineState: MachineState = {
 const RETRY_BASE_DELAY_MS = 450;
 const WRAP_UP_SECONDS = 20;
 // Silence timeout passed to voice recognition (ms)
-const SILENCE_TIMEOUT_MS = 1800;
+const SILENCE_TIMEOUT_MS = 2500;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
