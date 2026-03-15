@@ -37,8 +37,11 @@ function isReadyResponse(data: DebriefApiResponse | null): boolean {
     return true;
   }
   // Accept valid results even if status is missing or different
-  const hasTurnFeedback =
-    Array.isArray(data.turn_feedback) && data.turn_feedback.length > 0;
+  // Accepts both array and object-map shapes (mirrors normalizeCoachingTurns)
+  const tfLen = Array.isArray(data.turn_feedback)
+    ? data.turn_feedback.length
+    : Object.keys(data.turn_feedback ?? {}).length;
+  const hasTurnFeedback = tfLen > 0;
   const hasScores =
     !!(data.radar_scores ?? data.scores);
   return hasTurnFeedback || hasScores;
@@ -120,6 +123,7 @@ function normalizeCoachingTurns(raw: DebriefApiResponse): CoachingTurn[] {
     : Object.values(raw.turn_feedback || {});
 
   if (turns.length) {
+    console.log("first turn keys:", Object.keys(turns[0] as object));
     return turns.map((item, index) => {
       const turn = (item ?? {}) as Record<string, unknown>;
       const explicitScore =
@@ -651,6 +655,7 @@ export default function DebriefContent() {
                 <motion.div
                   key={item.questionId}
                   initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true, margin: "-60px" }}
                   transition={{ duration: 0.5, delay: i * 0.05, ease: [0.16, 1, 0.3, 1] }}
