@@ -15,7 +15,7 @@ import { getSessionId } from "@/lib/getSessionId";
 type DebriefApiResponse = Partial<FullResults> & {
   status?: string;
   scores?: Partial<RadarScores>;
-  turn_feedback?: unknown[];
+  turn_feedback?: unknown[] | Record<string, unknown>;
 };
 
 type CoachingTurn = {
@@ -113,10 +113,14 @@ function avgFromScores(scores: unknown): number {
 }
 
 function normalizeCoachingTurns(raw: DebriefApiResponse): CoachingTurn[] {
-  const feedbackTurns = Array.isArray(raw.turn_feedback) ? raw.turn_feedback : [];
+  console.log("turn_feedback raw:", raw.turn_feedback);
 
-  if (feedbackTurns.length) {
-    return feedbackTurns.map((item, index) => {
+  const turns = Array.isArray(raw.turn_feedback)
+    ? raw.turn_feedback
+    : Object.values(raw.turn_feedback || {});
+
+  if (turns.length) {
+    return turns.map((item, index) => {
       const turn = (item ?? {}) as Record<string, unknown>;
       const explicitScore =
         toNumber(turn.score) ??
