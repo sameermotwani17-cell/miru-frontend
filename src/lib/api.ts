@@ -9,6 +9,8 @@ import type {
   Transcript,
 } from "./types";
 
+const DEFAULT_FETCH_TIMEOUT_MS = 20_000;
+
 function normalizeCompanyForBackend(company: string): string {
   const raw = company.trim().toLowerCase();
   const map: Record<string, string> = {
@@ -34,12 +36,35 @@ class ApiError extends Error {
   }
 }
 
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit,
+  timeoutMs: number = DEFAULT_FETCH_TIMEOUT_MS
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new ApiError(408, "MIRU is thinking longer than expected...");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 async function request<T>(
   path: string,
   options?: RequestInit
 ): Promise<T> {
   const url = `${BASE}${path}`;
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(url, {
     headers: { "Content-Type": "application/json" },
     ...options,
   });
@@ -92,34 +117,59 @@ export async function sendInterviewTurn(
   const normalizedCompany = normalizeCompanyForBackend(company);
   const safeAnswer = userAnswer.trim().length === 0 ? "start" : userAnswer;
 
-  const response = await fetch(
-    "https://miru-backend-production.up.railway.app/api/interview/turn",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        company: normalizedCompany,
-        session_id: sessionId,
-        user_answer: safeAnswer,
-        ...(options?.forceComplete ? { force_complete: true } : {}),
-      }),
-    }
-  );
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    console.log("Sending interview turn", {
+      sessionId,
+      company: normalizedCompany,
+      attempt,
+    });
 
-  if (!response.ok) {
-    let messageText = `HTTP ${response.status}`;
     try {
-      const body = await response.json();
-      messageText = body.detail ?? body.message ?? messageText;
-    } catch {
-      // ignore parse errors
+      const response = await fetchWithTimeout(
+        "https://miru-backend-production.up.railway.app/api/interview/turn",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            company: normalizedCompany,
+            session_id: sessionId,
+            user_answer: safeAnswer,
+            ...(options?.forceComplete ? { force_complete: true } : {}),
+          }),
+        }
+      );
+
+      console.log("Response received", {
+        sessionId,
+        status: response.status,
+        ok: response.ok,
+        attempt,
+      });
+
+      if (!response.ok) {
+        let messageText = `HTTP ${response.status}`;
+        try {
+          const body = await response.json();
+          messageText = body.detail ?? body.message ?? messageText;
+        } catch {
+          // ignore parse errors
+        }
+        throw new ApiError(response.status, messageText);
+      }
+
+      return response.json() as Promise<InterviewTurnResponse>;
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 408 && attempt === 1) {
+        console.warn("Interview turn timed out; retrying once", { sessionId });
+        continue;
+      }
+      throw err;
     }
-    throw new ApiError(response.status, messageText);
   }
 
-  return response.json() as Promise<InterviewTurnResponse>;
+  throw new ApiError(408, "MIRU is thinking longer than expected...");
 }
 
 export async function getResults(sessionId: string): Promise<FullResults> {
