@@ -81,8 +81,8 @@ export interface InterviewScores {
 }
 
 export interface InterviewTurnResponse {
-  next_question: string;
-  interviewer_response: string;
+  next_question: string | null;
+  interviewer_response: string | null;
   question_id: string;
   scores: InterviewScores;
   interview_complete: boolean;

@@ -86,7 +86,8 @@ export async function sendInterviewTurn(
   userAnswer: string,
   sessionId: string,
   company: string,
-  language: "en" | "jp"
+  language: "en" | "jp",
+  options?: { forceComplete?: boolean }
 ): Promise<InterviewTurnResponse> {
   const normalizedCompany = normalizeCompanyForBackend(company);
   const safeAnswer = userAnswer.trim().length === 0 ? "start" : userAnswer;
@@ -102,6 +103,7 @@ export async function sendInterviewTurn(
         company: normalizedCompany,
         session_id: sessionId,
         user_answer: safeAnswer,
+        ...(options?.forceComplete ? { force_complete: true } : {}),
       }),
     }
   );

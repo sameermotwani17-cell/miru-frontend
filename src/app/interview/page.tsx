@@ -7,7 +7,7 @@ import MiruLogo from "@/components/MiruLogo";
 import HRAvatar from "@/components/HRAvatar";
 import VoiceInput from "@/components/VoiceInput";
 import { session } from "@/lib/session";
-import { speak, stopSpeech } from "@/lib/tts";
+import { speak, speakAndWait, stopSpeech } from "@/lib/tts";
 import { sendInterviewTurn } from "@/lib/api";
 import {
   startSpeechRecognition,
@@ -72,6 +72,7 @@ const initialMachineState: MachineState = {
 };
 
 const RETRY_BASE_DELAY_MS = 450;
+const WRAP_UP_SECONDS = 10;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -183,6 +184,7 @@ function InterviewPage() {
   const startedRef = useRef(false);
   const completingRef = useRef(false);
   const interviewCompleteRef = useRef(false);
+  const wrapUpTriggeredRef = useRef(false);
   const requestInFlightRef = useRef(false);
   const pendingRequestRef = useRef<{ kind: "start" | "answer"; answer: string } | null>(null);
 
@@ -196,7 +198,7 @@ function InterviewPage() {
   }, [machine.messages, machine.status]);
 
   const sendTurnWithRetry = useCallback(
-    async (userAnswer: string) => {
+    async (userAnswer: string, options?: { forceComplete?: boolean }) => {
       const maxAttempts = 3;
       let lastError: unknown = null;
 
@@ -208,7 +210,8 @@ function InterviewPage() {
             userAnswer,
             machine.sessionId,
             machine.company,
-            language
+            language,
+            options
           );
         } catch (err) {
           lastError = err;
@@ -228,11 +231,15 @@ function InterviewPage() {
     [machine.sessionId, machine.company, machine.languageMode]
   );
 
-  const finalizeInterview = useCallback(() => {
-    if (completingRef.current) {
+  const finalizeInterview = useCallback(async () => {
+    if (completingRef.current || interviewCompleteRef.current || !machine.sessionId) {
       return;
     }
+
     completingRef.current = true;
+    wrapUpTriggeredRef.current = true;
+    dispatch({ type: "WRAP_UP" });
+    stopSpeech();
 
     if (recognitionRef.current) {
       recognitionRef.current.stop();
@@ -244,12 +251,59 @@ function InterviewPage() {
       timerRef.current = null;
     }
 
-    session.setInterviewComplete(true);
-    dispatch({ type: "COMPLETED" });
-  }, []);
+    if (requestInFlightRef.current) {
+      const waitStartedAt = Date.now();
+      while (requestInFlightRef.current && Date.now() - waitStartedAt < 3000) {
+        await sleep(100);
+      }
+    }
+
+    requestInFlightRef.current = true;
+    pendingRequestRef.current = null;
+    const ttsLang = machine.languageMode === "jp" ? "ja-JP" : "en-US";
+
+    try {
+      const res = await sendTurnWithRetry("[Timer wrap-up]", { forceComplete: true });
+      const sid = machine.sessionId;
+
+      if (
+        res.interview_complete === true &&
+        res.next_question === null
+      ) {
+        interviewCompleteRef.current = true;
+        setInterviewComplete(true);
+        session.setInterviewComplete(true);
+
+        const closingLine = res.interviewer_response?.trim() || "Thank you for your time today.";
+        dispatch({ type: "APPEND_MESSAGE", role: "agent", text: closingLine });
+        dispatch({ type: "COMPLETED" });
+        await speakAndWait(closingLine, ttsLang);
+        stopSpeech();
+        router.push(`/debrief?session_id=${sid}`);
+        return;
+      }
+
+      dispatch({
+        type: "ERROR",
+        error: "Interview wrap-up is still processing. Please wait and retry.",
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to finalize interview.";
+      dispatch({ type: "ERROR", error: msg });
+    } finally {
+      requestInFlightRef.current = false;
+      completingRef.current = false;
+    }
+  }, [machine.sessionId, machine.languageMode, router, sendTurnWithRetry]);
 
   const executeStartTurn = useCallback(async () => {
-    if (requestInFlightRef.current || startedRef.current || interviewCompleteRef.current || !machine.sessionId) {
+    if (
+      requestInFlightRef.current ||
+      startedRef.current ||
+      interviewCompleteRef.current ||
+      wrapUpTriggeredRef.current ||
+      !machine.sessionId
+    ) {
       return;
     }
 
@@ -317,6 +371,7 @@ function InterviewPage() {
       if (
         requestInFlightRef.current ||
         interviewCompleteRef.current ||
+        wrapUpTriggeredRef.current ||
         !machine.sessionId ||
         machine.status === "WRAP_UP" ||
         machine.status === "COMPLETED"
@@ -366,6 +421,10 @@ function InterviewPage() {
           dispatch({ type: "COMPLETED" });
           stopSpeech();
           router.push(`/debrief?session_id=${sid}`);
+          return;
+        }
+
+        if (wrapUpTriggeredRef.current) {
           return;
         }
 
@@ -465,14 +524,19 @@ function InterviewPage() {
   }, [machine.status, machine.sessionId, executeStartTurn]);
 
   useEffect(() => {
-    if (timerMaxSecs > 0 && timerSeconds === 0 && machine.status !== "COMPLETED") {
-      dispatch({ type: "WRAP_UP" });
-      finalizeInterview();
+    if (
+      timerMaxSecs > 0 &&
+      timerSeconds <= WRAP_UP_SECONDS &&
+      !wrapUpTriggeredRef.current &&
+      !interviewCompleteRef.current &&
+      machine.status !== "COMPLETED"
+    ) {
+      void finalizeInterview();
     }
   }, [timerSeconds, timerMaxSecs, machine.status, finalizeInterview]);
 
   const startRecording = useCallback(() => {
-    if (machine.status !== "QUESTION") {
+    if (machine.status !== "QUESTION" || wrapUpTriggeredRef.current) {
       return;
     }
 
@@ -512,6 +576,10 @@ function InterviewPage() {
   }, [machine.status, machine.languageMode, executeAnswerTurn]);
 
   const stopRecordingFull = useCallback(() => {
+    if (wrapUpTriggeredRef.current) {
+      return;
+    }
+
     if (recognitionRef.current) {
       recognitionRef.current.stop();
       recognitionRef.current = null;
@@ -526,6 +594,10 @@ function InterviewPage() {
   }, [executeAnswerTurn]);
 
   const retryFailedRequest = useCallback(() => {
+    if (wrapUpTriggeredRef.current) {
+      return;
+    }
+
     const pending = pendingRequestRef.current;
     if (!pending || requestInFlightRef.current) {
       return;
