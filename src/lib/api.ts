@@ -24,7 +24,8 @@ function normalizeCompanyForBackend(company: string): string {
   return map[raw] ?? raw;
 }
 
-const BASE = process.env.NEXT_PUBLIC_API_URL;
+const BASE =
+  process.env.NEXT_PUBLIC_API_URL ?? "https://miru-backend-production.up.railway.app";
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||

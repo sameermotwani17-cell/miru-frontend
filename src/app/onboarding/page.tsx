@@ -139,7 +139,7 @@ export default function OnboardingPage() {
         user_name: name,
         target_role: role,
         company: backendCompany,
-        language_mode: languageMode,
+        language_mode: languageMode === "english" ? "en" : languageMode,
         duration_mins: selectedDuration.durationMins,
       });
 

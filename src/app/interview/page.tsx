@@ -74,8 +74,6 @@ const initialMachineState: MachineState = {
 
 const RETRY_BASE_DELAY_MS = 450;
 const WRAP_UP_SECONDS = 20;
-const WRAP_UP_CLOSING_LINE =
-  "Thank you for your time today. That concludes the interview. We appreciate your interest in Rakuten.";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -285,7 +283,7 @@ function InterviewPage() {
         setInterviewComplete(true);
         session.setInterviewComplete(true);
 
-        const closingLine = WRAP_UP_CLOSING_LINE;
+        const closingLine = `Thank you for your time today. That concludes the interview. We appreciate your interest in ${machine.company || "the company"}.`;
         dispatch({ type: "APPEND_MESSAGE", role: "agent", text: closingLine });
         dispatch({ type: "COMPLETED" });
         await speakAndWait(closingLine, ttsLang);
@@ -305,7 +303,7 @@ function InterviewPage() {
       requestInFlightRef.current = false;
       completingRef.current = false;
     }
-  }, [machine.sessionId, machine.languageMode, router, sendTurnWithRetry]);
+  }, [machine.sessionId, machine.languageMode, machine.company, router, sendTurnWithRetry]);
 
   const executeStartTurn = useCallback(async () => {
     if (
