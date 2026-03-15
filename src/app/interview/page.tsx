@@ -285,6 +285,7 @@ function InterviewPage() {
 
       if (
         res.interview_complete === true &&
+        res.debrief_ready === true &&
         res.next_question === null
       ) {
         interviewCompleteRef.current = true;
@@ -336,6 +337,7 @@ function InterviewPage() {
       const sid = machine.sessionId;
       if (
         res.interview_complete === true &&
+        res.debrief_ready === true &&
         res.next_question === null
       ) {
         if (!sid) {
@@ -435,6 +437,7 @@ function InterviewPage() {
         const sid = machine.sessionId;
         if (
           res.interview_complete === true &&
+          res.debrief_ready === true &&
           res.next_question === null
         ) {
           if (!sid) {
