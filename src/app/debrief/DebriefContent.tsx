@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import MiruLogo from "@/components/MiruLogo";
 import MiruRadarChart from "@/components/MiruRadarChart";
 import ScoreBar from "@/components/ScoreBar";
@@ -65,14 +65,15 @@ function getScoreColor(score: number): string {
 
 export default function DebriefContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [results, setResults] = useState<FullResults | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
     const id = searchParams.get("session_id") ?? session.getSessionId();
     if (!id) {
+      console.error("No session_id found in URL");
       router.push("/");
       return;
     }
@@ -96,7 +97,8 @@ export default function DebriefContent() {
         };
         setResults(data);
         session.setResults(data);
-      } catch {
+      } catch (err) {
+        console.error("Failed to load interview results", err);
         const stored = session.getResults();
         if (stored) {
           setResults(stored);
@@ -109,7 +111,7 @@ export default function DebriefContent() {
     };
 
     void loadResults();
-  }, [router, searchParams]);
+  }, [router]);
 
   const handlePracticeAgain = () => {
     session.clearForNewSession();

@@ -302,6 +302,10 @@ export default function InterviewPage() {
       const res = await sendTurnWithRetry("start");
       const sid = machine.sessionId ?? crypto.randomUUID();
       if (res.interview_complete) {
+        if (!sid) {
+          console.error("Missing session_id — cannot redirect to debrief");
+          return;
+        }
         interviewCompleteRef.current = true;
         setInterviewComplete(true);
         if (timerRef.current) {
@@ -313,7 +317,7 @@ export default function InterviewPage() {
         }
         dispatch({ type: "COMPLETED" });
         setTimeout(() => {
-          router.push(`/debrief?session_id=${sid}`);
+          window.location.href = `/debrief?session_id=${sid}`;
         }, 1500);
         return;
       }
@@ -390,6 +394,10 @@ export default function InterviewPage() {
         const res = await sendTurnWithRetry(safeAnswer);
         const sid = machine.sessionId ?? crypto.randomUUID();
         if (res.interview_complete) {
+          if (!sid) {
+            console.error("Missing session_id — cannot redirect to debrief");
+            return;
+          }
           interviewCompleteRef.current = true;
           setInterviewComplete(true);
           if (timerRef.current) {
@@ -413,7 +421,7 @@ export default function InterviewPage() {
           session.setInterviewComplete(true);
           dispatch({ type: "COMPLETED" });
           setTimeout(() => {
-            router.push(`/debrief?session_id=${sid}`);
+            window.location.href = `/debrief?session_id=${sid}`;
           }, 1500);
           return;
         }
