@@ -27,6 +27,9 @@ type CoachingTurn = {
   better_example: string;
 };
 
+const POLL_ATTEMPTS = 10;
+const POLL_DELAY_MS = 800;
+
 function isReadyResponse(data: DebriefApiResponse | null): boolean {
   if (!data) return false;
 
@@ -128,11 +131,38 @@ function normalizeCoachingTurns(raw: DebriefApiResponse): CoachingTurn[] {
   }
 
   const transcriptTurns = Array.isArray(raw.transcript) ? raw.transcript : [];
+  const firstTurn = (transcriptTurns[0] ?? {}) as unknown as Record<string, unknown>;
+
+  // Handle { role: "interviewer"|"candidate", text: string } format from backend
+  if ("role" in firstTurn) {
+    const pairs: CoachingTurn[] = [];
+    let qIdx = 0;
+    for (let i = 0; i < transcriptTurns.length; i++) {
+      const t = transcriptTurns[i] as unknown as Record<string, unknown>;
+      if (String(t.role ?? "") === "interviewer") {
+        const next = (transcriptTurns[i + 1] ?? {}) as unknown as Record<string, unknown>;
+        const candidateText =
+          String(next.role ?? "") === "candidate" ? String(next.text ?? "") : "";
+        pairs.push({
+          questionId: `q${qIdx + 1}`,
+          question: String(t.text ?? ""),
+          answer: candidateText,
+          score: 0,
+          feedback: "No feedback available.",
+          better_example: "No coaching example available.",
+        });
+        qIdx++;
+      }
+    }
+    return pairs;
+  }
+
   return transcriptTurns.map((turn, index) => {
+    const t = turn as unknown as Record<string, unknown>;
     return {
-      questionId: String(turn.question_id ?? `q${index + 1}`),
-      question: String(turn.question ?? ""),
-      answer: String(turn.user_answer ?? ""),
+      questionId: String(t.question_id ?? `q${index + 1}`),
+      question: String(t.question ?? ""),
+      answer: String(t.user_answer ?? ""),
       score: 0,
       feedback: "No feedback available.",
       better_example: "No coaching example available.",
@@ -262,17 +292,32 @@ export default function DebriefContent() {
     console.log("Fetching results for session:", id);
 
     try {
-      const res = await fetch(
-        `/api/interview/results?session_id=${encodeURIComponent(id)}`
-      ).catch(() => null);
+      let data: DebriefApiResponse | null = null;
 
-      const data = res
-        ? ((await res.json().catch(() => null)) as DebriefApiResponse | null)
-        : null;
+      for (let attempt = 0; attempt < POLL_ATTEMPTS; attempt++) {
+        console.log("Fetching interview results attempt", attempt + 1);
 
-      console.log("Results received:", data);
+        const res = await fetch(
+          `/api/interview/results?session_id=${encodeURIComponent(id)}`
+        ).catch(() => null);
 
-      if (!data || !isReadyResponse(data)) {
+        const parsed = res
+          ? ((await res.json().catch(() => null)) as DebriefApiResponse | null)
+          : null;
+
+        console.log("Results received:", parsed);
+
+        if (parsed && isReadyResponse(parsed)) {
+          data = parsed;
+          break;
+        }
+
+        if (attempt < POLL_ATTEMPTS - 1) {
+          await new Promise((r) => setTimeout(r, POLL_DELAY_MS));
+        }
+      }
+
+      if (!data) {
         setError("Unable to load interview results.");
         return;
       }
