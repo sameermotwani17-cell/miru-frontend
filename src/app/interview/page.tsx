@@ -184,8 +184,11 @@ export default function InterviewPage() {
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
   const chatBottomRef = useRef<HTMLDivElement | null>(null);
 
+  const [interviewComplete, setInterviewComplete] = useState(false);
+
   const startedRef = useRef(false);
   const completingRef = useRef(false);
+  const interviewCompleteRef = useRef(false);
   const requestInFlightRef = useRef(false);
   const pendingRequestRef = useRef<{ kind: "start" | "answer"; answer: string } | null>(null);
 
@@ -284,7 +287,7 @@ export default function InterviewPage() {
   }, [machine.messages, machine.company]);
 
   const executeStartTurn = useCallback(async () => {
-    if (requestInFlightRef.current || startedRef.current || !machine.sessionId) {
+    if (requestInFlightRef.current || startedRef.current || interviewCompleteRef.current || !machine.sessionId) {
       return;
     }
 
@@ -299,7 +302,19 @@ export default function InterviewPage() {
       const res = await sendTurnWithRetry("start");
       const sid = machine.sessionId ?? crypto.randomUUID();
       if (res.interview_complete) {
-        router.push(`/debrief?session_id=${sid}`);
+        interviewCompleteRef.current = true;
+        setInterviewComplete(true);
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+        if (res.interviewer_response) {
+          dispatch({ type: "APPEND_MESSAGE", role: "agent", text: res.interviewer_response.trim() });
+        }
+        dispatch({ type: "COMPLETED" });
+        setTimeout(() => {
+          router.push(`/debrief?session_id=${sid}`);
+        }, 1500);
         return;
       }
 
@@ -335,6 +350,7 @@ export default function InterviewPage() {
     async (answer: string, appendUser: boolean) => {
       if (
         requestInFlightRef.current ||
+        interviewCompleteRef.current ||
         !machine.sessionId ||
         machine.status === "WRAP_UP" ||
         machine.status === "COMPLETED"
@@ -374,6 +390,15 @@ export default function InterviewPage() {
         const res = await sendTurnWithRetry(safeAnswer);
         const sid = machine.sessionId ?? crypto.randomUUID();
         if (res.interview_complete) {
+          interviewCompleteRef.current = true;
+          setInterviewComplete(true);
+          if (timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+          }
+          if (res.interviewer_response) {
+            dispatch({ type: "APPEND_MESSAGE", role: "agent", text: res.interviewer_response.trim() });
+          }
           const finalScores = turnScoresRef.current.length
             ? turnScoresRef.current
             : [scoreAnswer(safeAnswer)];
@@ -386,7 +411,10 @@ export default function InterviewPage() {
           );
           session.setResults(results);
           session.setInterviewComplete(true);
-          router.push(`/debrief?session_id=${sid}`);
+          dispatch({ type: "COMPLETED" });
+          setTimeout(() => {
+            router.push(`/debrief?session_id=${sid}`);
+          }, 1500);
           return;
         }
 
