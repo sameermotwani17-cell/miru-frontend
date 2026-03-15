@@ -72,7 +72,9 @@ const initialMachineState: MachineState = {
 };
 
 const RETRY_BASE_DELAY_MS = 450;
-const WRAP_UP_SECONDS = 10;
+const WRAP_UP_SECONDS = 20;
+const WRAP_UP_CLOSING_LINE =
+  "Thank you for your time today. That concludes the interview. We appreciate your interest in Rakuten.";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -274,7 +276,7 @@ function InterviewPage() {
         setInterviewComplete(true);
         session.setInterviewComplete(true);
 
-        const closingLine = res.interviewer_response?.trim() || "Thank you for your time today.";
+        const closingLine = WRAP_UP_CLOSING_LINE;
         dispatch({ type: "APPEND_MESSAGE", role: "agent", text: closingLine });
         dispatch({ type: "COMPLETED" });
         await speakAndWait(closingLine, ttsLang);
