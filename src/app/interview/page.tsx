@@ -376,7 +376,7 @@ function InterviewPage() {
       });
 
       console.log("VOICE: TTS starting (first question)");
-      await speakAndWait([agentReply, nextQuestion].filter(Boolean), ttsLang);
+      await speakAndWait(res.tts_text ?? [agentReply, nextQuestion].filter(Boolean), ttsLang);
       console.log("VOICE: TTS done — auto-starting mic");
 
       if (!wrapUpTriggeredRef.current && !interviewCompleteRef.current) {
@@ -486,7 +486,7 @@ function InterviewPage() {
         transcriptRef.current = "";
 
         console.log("VOICE: TTS starting");
-        await speakAndWait([agentReply, nextQuestion].filter(Boolean), ttsLang);
+        await speakAndWait(res.tts_text ?? [agentReply, nextQuestion].filter(Boolean), ttsLang);
         console.log("VOICE: TTS done — auto-starting mic");
 
         if (!wrapUpTriggeredRef.current && !interviewCompleteRef.current) {
@@ -692,9 +692,7 @@ function InterviewPage() {
       if (transcriptPreviewTimeoutRef.current) clearTimeout(transcriptPreviewTimeoutRef.current);
       if (timerRef.current) clearInterval(timerRef.current);
       if (recognitionRef.current) recognitionRef.current.stop();
-      if (typeof window !== "undefined") {
-        window.speechSynthesis?.cancel();
-      }
+      stopSpeech();
     };
   }, []);
 

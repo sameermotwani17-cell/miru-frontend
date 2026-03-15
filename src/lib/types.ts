@@ -92,6 +92,7 @@ export interface InterviewTurnResponse {
   question_id: string;
   scores: InterviewScores;
   interview_complete: boolean;
+  tts_text?: string | null;
 }
 
 export function mapInterviewScoresToRadar(scores: InterviewScores): RadarScores {

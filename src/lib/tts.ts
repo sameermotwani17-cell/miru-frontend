@@ -1,37 +1,13 @@
-export function speak(texts: string | string[], lang: string = "en-US") {
-  void speakAndWait(texts, lang);
-}
+import { speak as elevenSpeak, stopSpeech as elevenStop } from "@/services/voice";
 
-export async function speakAndWait(texts: string | string[], lang: string = "en-US") {
-  if (typeof window === "undefined" || !window.speechSynthesis) return;
+export { elevenStop as stopSpeech };
 
-  const list = (Array.isArray(texts) ? texts : [texts]).filter((t) => t?.trim());
+export async function speakAndWait(texts: string | string[], _lang?: string): Promise<void> {
+  const list = (Array.isArray(texts) ? texts : [texts]).filter((t) => Boolean(t?.trim()));
   if (!list.length) return;
-
-  window.speechSynthesis.cancel();
-
-  await new Promise<void>((resolve) => {
-    const speakNext = (i: number) => {
-      if (i >= list.length) {
-        resolve();
-        return;
-      }
-
-      const utt = new SpeechSynthesisUtterance(list[i]);
-      utt.lang = lang;
-      utt.rate = 1;
-      utt.pitch = 1;
-      utt.onend = () => speakNext(i + 1);
-      utt.onerror = () => resolve();
-      window.speechSynthesis.speak(utt);
-    };
-
-    speakNext(0);
-  });
+  await elevenSpeak(list.join(" "));
 }
 
-export function stopSpeech() {
-  if (typeof window !== "undefined") {
-    window.speechSynthesis?.cancel();
-  }
+export function speak(texts: string | string[], _lang?: string): void {
+  void speakAndWait(texts);
 }
