@@ -568,6 +568,9 @@ function InterviewPage() {
       },
       {
         lang: machine.languageMode === "jp" ? "ja-JP" : "en-US",
+        // Explicit 1800ms silence timeout — matches the default in voice.ts but
+        // stated here so it's visible and easy to tune per-language in future.
+        silenceTimeoutMs: 1800,
         onError: (message) => {
           dispatch({ type: "ERROR", error: message });
         },
@@ -875,10 +878,10 @@ function InterviewPage() {
               color: "#c8c9e6",
             }}
           >
-            <div>Communication: {machine.latestScores.communication}</div>
-            <div>Clarity: {machine.latestScores.clarity}</div>
-            <div>Cultural Fit: {machine.latestScores.cultural_fit}</div>
-            <div>Problem Solving: {machine.latestScores.problem_solving}</div>
+            <div>Communication: {Number(machine.latestScores.communication ?? 0).toFixed(1)}</div>
+            <div>Clarity: {Number(machine.latestScores.clarity ?? 0).toFixed(1)}</div>
+            <div>Cultural Fit: {Number(machine.latestScores.cultural_fit ?? 0).toFixed(1)}</div>
+            <div>Problem Solving: {Number(machine.latestScores.problem_solving ?? 0).toFixed(1)}</div>
           </div>
         )}
 
@@ -929,6 +932,19 @@ function InterviewPage() {
           onStartRecording={startRecording}
           onStopRecording={stopRecordingFull}
           disabled={inputDisabled}
+          statusText={
+            machine.status === "LISTENING"
+              ? "Tap to stop · hold mic close"
+              : machine.status === "TRANSCRIBING"
+              ? "Processing your answer..."
+              : machine.status === "WAITING_RESPONSE" || machine.status === "STARTING"
+              ? "MIRU is speaking..."
+              : machine.status === "COMPLETED"
+              ? "Interview complete"
+              : inputDisabled
+              ? "Please wait..."
+              : "Tap mic to answer"
+          }
         />
       </div>
 

@@ -78,11 +78,13 @@ export interface InterviewTurnResponse {
 }
 
 export function mapInterviewScoresToRadar(scores: InterviewScores): RadarScores {
+  // Coerce to number so null/undefined from partial API responses never
+  // propagate into score calculations or chart rendering.
   return {
-    communication: scores.communication,
-    clarity: scores.clarity,
-    cultural_fit: scores.cultural_fit,
-    problem_solving: scores.problem_solving,
+    communication: Number(scores.communication ?? 0),
+    clarity: Number(scores.clarity ?? 0),
+    cultural_fit: Number(scores.cultural_fit ?? 0),
+    problem_solving: Number(scores.problem_solving ?? 0),
   };
 }
 

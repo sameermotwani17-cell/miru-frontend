@@ -37,6 +37,14 @@ export interface StartSpeechRecognitionOptions {
   onEnd?: () => void;
 }
 
+// How long silence must persist (after the minimum speech window) before we
+// auto-stop. 1800ms gives natural pause tolerance between sentences.
+const DEFAULT_SILENCE_TIMEOUT_MS = 1800;
+
+// For the first MIN_SPEECH_WINDOW_MS after speech begins, silence cannot end
+// the session — prevents mid-sentence cutoffs on brief pauses.
+const MIN_SPEECH_WINDOW_MS = 2000;
+
 export function startSpeechRecognition(
   onResult: (text: string) => void,
   options: StartSpeechRecognitionOptions = {}
@@ -62,21 +70,11 @@ export function startSpeechRecognition(
   recognition.lang = options.lang ?? "en-US";
   recognition.interimResults = options.interimResults ?? true;
 
-  const silenceTimeoutMs = options.silenceTimeoutMs ?? 1500;
+  const silenceTimeoutMs = options.silenceTimeoutMs ?? DEFAULT_SILENCE_TIMEOUT_MS;
   let silenceTimer: ReturnType<typeof setTimeout> | null = null;
   let hasDetectedSpeech = false;
-
-  const resetSilenceTimer = () => {
-    if (!hasDetectedSpeech) {
-      return;
-    }
-    if (silenceTimer) {
-      clearTimeout(silenceTimer);
-    }
-    silenceTimer = setTimeout(() => {
-      recognition.stop();
-    }, silenceTimeoutMs);
-  };
+  // Timestamp of the first speech result — used to enforce minimum speech window
+  let speechStartTime: number | null = null;
 
   const clearSilenceTimer = () => {
     if (!silenceTimer) {
@@ -86,8 +84,32 @@ export function startSpeechRecognition(
     silenceTimer = null;
   };
 
+  const resetSilenceTimer = () => {
+    if (!hasDetectedSpeech) {
+      return;
+    }
+    clearSilenceTimer();
+
+    const now = Date.now();
+    const speechElapsed = speechStartTime !== null ? now - speechStartTime : 0;
+
+    // If we are still inside the minimum speech window, extend the effective
+    // timeout so it expires no earlier than MIN_SPEECH_WINDOW_MS from when
+    // speech first started. This acts as both the minimum window AND the
+    // resume buffer — any new speech resets this same timer.
+    const effectiveTimeout =
+      speechElapsed < MIN_SPEECH_WINDOW_MS
+        ? silenceTimeoutMs + (MIN_SPEECH_WINDOW_MS - speechElapsed)
+        : silenceTimeoutMs;
+
+    silenceTimer = setTimeout(() => {
+      recognition.stop();
+    }, effectiveTimeout);
+  };
+
   recognition.onstart = () => {
     hasDetectedSpeech = false;
+    speechStartTime = null;
     clearSilenceTimer();
   };
 
@@ -95,7 +117,10 @@ export function startSpeechRecognition(
     const latestResult = event.results[event.results.length - 1];
     const text = latestResult?.[0]?.transcript?.trim();
     if (text) {
-      hasDetectedSpeech = true;
+      if (!hasDetectedSpeech) {
+        hasDetectedSpeech = true;
+        speechStartTime = Date.now();
+      }
       onResult(text);
       resetSilenceTimer();
     }

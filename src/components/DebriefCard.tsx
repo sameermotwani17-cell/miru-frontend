@@ -181,10 +181,10 @@ export default function DebriefCard({ turn, index }: DebriefCardProps) {
                   fontFamily: "var(--font-display)",
                   fontSize: 12,
                   fontWeight: 700,
-                  color: getScoreColor(turn.scores[key]),
+                  color: getScoreColor(Number(turn.scores[key] ?? 0)),
                 }}
               >
-                {turn.scores[key].toFixed(1)}
+                {Number(turn.scores[key] ?? 0).toFixed(1)}
               </span>
             </div>
           )
