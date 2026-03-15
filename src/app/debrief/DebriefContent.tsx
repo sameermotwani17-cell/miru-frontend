@@ -85,8 +85,15 @@ export default function DebriefContent() {
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`);
         }
-        const data = (await response.json()) as FullResults;
-        console.log("Debrief API response:", data);
+        const raw = (await response.json()) as FullResults & { scores?: RadarScores };
+        console.log("Debrief API response:", raw);
+        // Normalize schema: backend may return `scores` instead of `radar_scores`
+        const data: FullResults = {
+          radar_scores: raw.radar_scores ?? raw.scores ?? { communication: 0, clarity: 0, cultural_fit: 0, problem_solving: 0 },
+          transcript: raw.transcript ?? [],
+          feedback: raw.feedback ?? "",
+          hiring_signal: raw.hiring_signal ?? "",
+        };
         setResults(data);
         session.setResults(data);
       } catch {

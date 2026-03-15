@@ -167,7 +167,6 @@ export default function InterviewPage() {
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [timerMaxSecs, setTimerMaxSecs] = useState(0);
   const [durationId, setDurationId] = useState("");
-  const [interviewerResponse, setInterviewerResponse] = useState("");
 
   const askedQuestionsRef = useRef<string[]>([]);
   const answersRef = useRef<string[]>([]);
@@ -198,18 +197,6 @@ export default function InterviewPage() {
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [machine.messages, machine.status]);
-
-  // Speak interviewer response via Web Speech API whenever it changes
-  useEffect(() => {
-    if (!interviewerResponse) return;
-    if (typeof window === "undefined" || !window.speechSynthesis) return;
-    const utterance = new SpeechSynthesisUtterance(interviewerResponse);
-    utterance.rate = 1;
-    utterance.pitch = 1;
-    utterance.lang = machine.languageMode === "jp" ? "ja-JP" : "en-US";
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utterance);
-  }, [interviewerResponse, machine.languageMode]);
 
   const sendTurnWithRetry = useCallback(
     async (userAnswer: string) => {
@@ -324,7 +311,6 @@ export default function InterviewPage() {
 
       if (agentReply) {
         dispatch({ type: "APPEND_MESSAGE", role: "agent", text: agentReply });
-        setInterviewerResponse(agentReply);
         await sleep(400);
       }
 
@@ -335,7 +321,7 @@ export default function InterviewPage() {
         isFirst: !agentReply,
       });
 
-      speak(nextQuestion, ttsLang);
+      speak([agentReply, nextQuestion].filter(Boolean), ttsLang);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to start interview.";
       dispatch({ type: "ERROR", error: msg });
@@ -388,6 +374,18 @@ export default function InterviewPage() {
         const res = await sendTurnWithRetry(safeAnswer);
         const sid = machine.sessionId ?? crypto.randomUUID();
         if (res.interview_complete) {
+          const finalScores = turnScoresRef.current.length
+            ? turnScoresRef.current
+            : [scoreAnswer(safeAnswer)];
+          const results = buildResults(
+            askedQuestionsRef.current.length ? askedQuestionsRef.current : ["Interview"],
+            answersRef.current.length ? answersRef.current : [safeAnswer],
+            finalScores,
+            machine.company,
+            session.getCandidateName() ?? ""
+          );
+          session.setResults(results);
+          session.setInterviewComplete(true);
           router.push(`/debrief?session_id=${sid}`);
           return;
         }
@@ -410,7 +408,6 @@ export default function InterviewPage() {
         // Show interviewer_response first, then next_question
         if (agentReply) {
           dispatch({ type: "APPEND_MESSAGE", role: "agent", text: agentReply });
-          setInterviewerResponse(agentReply);
           await sleep(400);
         }
 
@@ -421,7 +418,7 @@ export default function InterviewPage() {
           isFirst: false,
         });
 
-        speak(nextQuestion, ttsLang);
+        speak([agentReply, nextQuestion].filter(Boolean), ttsLang);
 
         setTranscript("");
         transcriptRef.current = "";

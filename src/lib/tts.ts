@@ -1,11 +1,20 @@
-export function speak(text: string, lang: string = "en-US") {
+export function speak(texts: string | string[], lang: string = "en-US") {
   if (typeof window === "undefined" || !window.speechSynthesis) return;
 
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = lang;
-  utterance.rate = 1;
-  utterance.pitch = 1;
+  const list = (Array.isArray(texts) ? texts : [texts]).filter((t) => t?.trim());
+  if (!list.length) return;
 
   window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(utterance);
+
+  const speakNext = (i: number) => {
+    if (i >= list.length) return;
+    const utt = new SpeechSynthesisUtterance(list[i]);
+    utt.lang = lang;
+    utt.rate = 1;
+    utt.pitch = 1;
+    utt.onend = () => speakNext(i + 1);
+    window.speechSynthesis.speak(utt);
+  };
+
+  speakNext(0);
 }
