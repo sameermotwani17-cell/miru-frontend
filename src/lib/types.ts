@@ -12,6 +12,12 @@ export interface TranscriptHistoryItem {
   user_answer: string;
 }
 
+// Actual backend transcript format: role/text pairs
+export type TranscriptTurn = {
+  role: "interviewer" | "candidate";
+  text: string;
+};
+
 export interface TurnFeedback {
   question_id: string;
   question: string;
@@ -40,7 +46,7 @@ export interface FeedbackObject {
 
 export interface FullResults {
   radar_scores: RadarScores;
-  transcript: TranscriptHistoryItem[];
+  transcript: TranscriptTurn[];
   // Backend sometimes returns a structured object instead of a plain string.
   feedback: string | FeedbackObject;
   hiring_signal: string;

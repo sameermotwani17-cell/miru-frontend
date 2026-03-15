@@ -7,7 +7,7 @@ import MiruLogo from "@/components/MiruLogo";
 import MiruRadarChart from "@/components/MiruRadarChart";
 import ScoreBar from "@/components/ScoreBar";
 import { session } from "@/lib/session";
-import type { FullResults, FeedbackObject, RadarScores } from "@/lib/types";
+import type { FullResults, FeedbackObject, RadarScores, TranscriptTurn } from "@/lib/types";
 import { DIMENSION_LABELS } from "@/lib/types";
 import { normalizeScores } from "@/lib/resultsNormalizer";
 import { getSessionId } from "@/lib/getSessionId";
@@ -27,14 +27,12 @@ type CoachingTurn = {
   better_example: string;
 };
 
-const POLL_ATTEMPTS = 10;
-const POLL_DELAY_MS = 800;
+const POLL_ATTEMPTS = 12;
+const POLL_DELAY_MS = 700;
 
 function isReadyResponse(data: DebriefApiResponse | null): boolean {
   if (!data) return false;
-
-  const status = typeof data.status === "string" ? data.status.toLowerCase() : "";
-  return status === "ready" || (Array.isArray(data.turn_feedback) && data.turn_feedback.length > 0);
+  return typeof data.status === "string" && data.status.toLowerCase() === "ready";
 }
 
 function SectionHeader({ label, title }: { label: string; title: string }) {
@@ -130,44 +128,21 @@ function normalizeCoachingTurns(raw: DebriefApiResponse): CoachingTurn[] {
     });
   }
 
-  const transcriptTurns = Array.isArray(raw.transcript) ? raw.transcript : [];
-  const firstTurn = (transcriptTurns[0] ?? {}) as unknown as Record<string, unknown>;
+  const transcriptTurns: TranscriptTurn[] = Array.isArray(raw.transcript)
+    ? (raw.transcript as TranscriptTurn[])
+    : [];
 
-  // Handle { role: "interviewer"|"candidate", text: string } format from backend
-  if ("role" in firstTurn) {
-    const pairs: CoachingTurn[] = [];
-    let qIdx = 0;
-    for (let i = 0; i < transcriptTurns.length; i++) {
-      const t = transcriptTurns[i] as unknown as Record<string, unknown>;
-      if (String(t.role ?? "") === "interviewer") {
-        const next = (transcriptTurns[i + 1] ?? {}) as unknown as Record<string, unknown>;
-        const candidateText =
-          String(next.role ?? "") === "candidate" ? String(next.text ?? "") : "";
-        pairs.push({
-          questionId: `q${qIdx + 1}`,
-          question: String(t.text ?? ""),
-          answer: candidateText,
-          score: 0,
-          feedback: "No feedback available.",
-          better_example: "No coaching example available.",
-        });
-        qIdx++;
-      }
-    }
-    return pairs;
-  }
+  const interviewerTurns = transcriptTurns.filter((t) => t.role === "interviewer");
+  const candidateTurns = transcriptTurns.filter((t) => t.role === "candidate");
 
-  return transcriptTurns.map((turn, index) => {
-    const t = turn as unknown as Record<string, unknown>;
-    return {
-      questionId: String(t.question_id ?? `q${index + 1}`),
-      question: String(t.question ?? ""),
-      answer: String(t.user_answer ?? ""),
-      score: 0,
-      feedback: "No feedback available.",
-      better_example: "No coaching example available.",
-    };
-  });
+  return interviewerTurns.map((turn, index) => ({
+    questionId: `q${index + 1}`,
+    question: turn.text,
+    answer: candidateTurns[index]?.text ?? "No answer captured",
+    score: 0,
+    feedback: "No feedback available.",
+    better_example: "No coaching example available.",
+  }));
 }
 
 function renderFeedback(fb: string | FeedbackObject | null | undefined) {
@@ -295,7 +270,7 @@ export default function DebriefContent() {
       let data: DebriefApiResponse | null = null;
 
       for (let attempt = 0; attempt < POLL_ATTEMPTS; attempt++) {
-        console.log("Fetching interview results attempt", attempt + 1);
+        console.log("Polling results attempt", attempt + 1);
 
         const res = await fetch(
           `/api/interview/results?session_id=${encodeURIComponent(id)}`
