@@ -6,12 +6,27 @@ const BACKEND_BASE =
 
 export async function GET(request: NextRequest) {
   const sessionId = request.nextUrl.searchParams.get("session_id")?.trim();
+  const checkStatus = request.nextUrl.searchParams.get("check") === "status";
 
   if (!sessionId) {
     return NextResponse.json(
       { detail: "Missing required query param: session_id" },
       { status: 400 }
     );
+  }
+
+  // Debrief-status check: proxy to the backend status endpoint
+  if (checkStatus) {
+    try {
+      const statusRes = await fetch(
+        `${BACKEND_BASE}/api/interview/${encodeURIComponent(sessionId)}/debrief-status`,
+        { method: "GET", cache: "no-store" }
+      );
+      const body = await statusRes.json().catch(() => null);
+      return NextResponse.json(body ?? {}, { status: statusRes.status });
+    } catch {
+      return NextResponse.json({ detail: "Status check unavailable." }, { status: 502 });
+    }
   }
 
   const candidateUrls = [
