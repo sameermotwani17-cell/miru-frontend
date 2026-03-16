@@ -141,6 +141,7 @@ export async function sendInterviewTurn(
             company: normalizedCompany,
             session_id: sessionId,
             user_answer: safeAnswer,
+            voice_mode: true,
             ...(options?.forceComplete ? { force_complete: true } : {}),
           }),
         }

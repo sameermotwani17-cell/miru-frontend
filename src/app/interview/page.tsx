@@ -7,7 +7,7 @@ import MiruLogo from "@/components/MiruLogo";
 import HRAvatar from "@/components/HRAvatar";
 import VoiceInput from "@/components/VoiceInput";
 import { session } from "@/lib/session";
-import { speakAndWait, stopSpeech } from "@/lib/tts";
+import { speakAndWait, stopSpeech, playBase64Audio } from "@/lib/tts";
 import { sendInterviewTurn } from "@/lib/api";
 import {
   startSpeechRecognition,
@@ -378,7 +378,11 @@ function InterviewPage() {
       });
 
       console.log("VOICE: TTS starting (first question)");
-      await speakAndWait(res.tts_text ?? [agentReply, nextQuestion].filter(Boolean), ttsLang);
+      if (res.voice_audio) {
+        await playBase64Audio(res.voice_audio);
+      } else {
+        await speakAndWait(res.tts_text ?? [agentReply, nextQuestion].filter(Boolean), ttsLang);
+      }
       console.log("VOICE: TTS done — auto-starting mic");
 
       if (!wrapUpTriggeredRef.current && !interviewCompleteRef.current) {
@@ -489,7 +493,11 @@ function InterviewPage() {
         transcriptRef.current = "";
 
         console.log("VOICE: TTS starting");
-        await speakAndWait(res.tts_text ?? [agentReply, nextQuestion].filter(Boolean), ttsLang);
+        if (res.voice_audio) {
+          await playBase64Audio(res.voice_audio);
+        } else {
+          await speakAndWait(res.tts_text ?? [agentReply, nextQuestion].filter(Boolean), ttsLang);
+        }
         console.log("VOICE: TTS done — auto-starting mic");
 
         if (!wrapUpTriggeredRef.current && !interviewCompleteRef.current) {

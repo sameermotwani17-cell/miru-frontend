@@ -67,3 +67,36 @@ export function stopSpeech(): void {
     currentAudio = null;
   }
 }
+
+export async function playBase64Audio(base64: string): Promise<void> {
+  if (typeof window === "undefined" || !base64?.trim()) return;
+
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio = null;
+  }
+
+  const byteChars = atob(base64);
+  const bytes = new Uint8Array(byteChars.length);
+  for (let i = 0; i < byteChars.length; i++) {
+    bytes[i] = byteChars.charCodeAt(i);
+  }
+  const blob = new Blob([bytes], { type: "audio/mpeg" });
+  const audioUrl = URL.createObjectURL(blob);
+  const audio = new Audio(audioUrl);
+  currentAudio = audio;
+
+  await new Promise<void>((resolve) => {
+    audio.onended = () => {
+      URL.revokeObjectURL(audioUrl);
+      currentAudio = null;
+      resolve();
+    };
+    audio.onerror = () => {
+      URL.revokeObjectURL(audioUrl);
+      currentAudio = null;
+      resolve();
+    };
+    audio.play().catch(() => resolve());
+  });
+}
