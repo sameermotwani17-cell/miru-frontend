@@ -1,5 +1,7 @@
 <p align="center"><img src="assets/banner.svg" alt="MIRU 見る" width="100%" /></p>
 
+<p align="center"><img src="assets/banner.svg" alt="MIRU 見る" width="100%" /></p>
+
 **Your AI-powered gateway to Japan's top companies**
 
 *Simulate. Score. Succeed.*
@@ -401,3 +403,7 @@ MIT License — built with 💙 for cultural bridges.
 <p align="center"><img src="assets/divider.svg" alt="" width="100%" /></p>
 
 <p align="center"><sub>Built by <a href="https://github.com/sameermotwani17-cell">Sameer Motwani</a> · <a href="https://portfolio-sameermotwani17-cells-projects.vercel.app">portfolio</a></sub></p>
+
+<p align="center"><img src="assets/divider.svg" alt="" width="100%" /></p>
+
+<p align="center"><sub>Built by <a href="https://github.com/sameermotwani17-cell">Sameer Motwani</a> · <a href="https://xsofficialbrand.com">portfolio</a></sub></p>
